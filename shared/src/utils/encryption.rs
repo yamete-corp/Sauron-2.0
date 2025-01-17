@@ -53,26 +53,25 @@ pub fn convert_bytes_to_key(key_bytes: [u8; 32]) -> Result<String> {
 }
 
 pub fn encrypt_timestamp(encryption_key: [u8; 32]) -> Result<String> {
-    let now = Utc::now().to_rfc3339();
-    let encrypted_datetime = sauron_encrypt(encryption_key, now.as_bytes())?;
+    let now = Utc::now().timestamp();
+    let encrypted_datetime = sauron_encrypt(encryption_key, &now.to_le_bytes())?;
 
-    // Return as a base64 string for folder name safety
-    Ok(
-        general_purpose::STANDARD
-            .encode(encrypted_datetime)
-            .replace('/', "-") // Replace / with -
-            .replace('+', "_")
-    )
+    Ok(general_purpose::STANDARD.encode(encrypted_datetime).replace('/', "-").replace('+', "_"))
 }
 
-pub fn decrypt_timestamp(encrypted_string: String, encryption_key: [u8; 32]) -> Result<String> {
+pub fn decrypt_timestamp(encrypted_string: String, encryption_key: [u8; 32]) -> Result<i64> {
     let encrypted_data = general_purpose::STANDARD
         .decode(encrypted_string.replace('-', "/").replace('_', "+"))
         .unwrap();
 
     // Decrypt the datetime
     let decrypted_datetime = sauron_decrypt(encryption_key, &encrypted_data)?;
+    let byte_array: [u8; 8] = decrypted_datetime
+        .into_iter()
+        .collect::<Vec<u8>>()
+        .try_into()
+        .map_err(|_| anyhow!(s!("Failed to convert to byte array").to_owned()))?;
 
     // Return the decrypted datetime as a string
-    Ok(String::from_utf8(decrypted_datetime)?)
+    Ok(i64::from_le_bytes(byte_array))
 }

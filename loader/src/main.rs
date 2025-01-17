@@ -150,7 +150,7 @@ fn main() {
     if is_safe_mode() {
         if is_system {
             tag!("CLEANUP");
-            //s! TODO
+            //! TODO
         } else {
             tag!("LAUNCH-CLEANUP");
             if
@@ -171,13 +171,13 @@ fn main() {
         true
     });
     if is_service {
-        //s! TODO
-        //s! run service runner
+        //! TODO
+        //! run service runner
     } else {
         if is_running_from_system_dir {
             if is_system {
                 tag!("SYS-SERVICE-INSTALL");
-                //s! TODO
+                //! TODO
             } else {
                 tag!("LAUNCH-SYS-SERVICE-INSTALL");
                 if

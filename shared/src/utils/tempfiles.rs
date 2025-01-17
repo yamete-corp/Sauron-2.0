@@ -1,19 +1,24 @@
 use std::fs::File;
-use std::io;
+use std::path::PathBuf;
+use std::{ env, io };
 use std::os::windows::prelude::{ AsRawHandle, FromRawHandle };
 use winapi::shared::ntdef::HANDLE;
 use winapi::shared::minwindef::DWORD;
 use winapi::um::fileapi::{ CreateFileA, CREATE_ALWAYS };
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::winbase::FILE_FLAG_DELETE_ON_CLOSE;
-use winapi::um::winnt::{ FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_TEMPORARY, GENERIC_ALL };
+use winapi::um::winnt::{ FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_TEMPORARY, GENERIC_WRITE };
 
-pub fn create_temp_file() -> io::Result<File> {
-    let file_name = "temp_file";
+pub fn create_temp_file(file_name: &str) -> io::Result<(File, PathBuf)> {
+    let temp_dir = env::temp_dir();
+    // file_name.push_str(&format!("{}", rand::random::<u64>()));
+    let full_path = temp_dir.join(file_name);
+    let full_path_str = full_path.to_str().unwrap();
+    println!("{}", full_path_str);
     let file_handle: HANDLE = unsafe {
         CreateFileA(
-            file_name.as_ptr() as *const i8,
-            GENERIC_ALL,
+            full_path_str.as_ptr() as *const i8,
+            GENERIC_WRITE,
             0,
             core::ptr::null_mut(),
             CREATE_ALWAYS,
@@ -27,16 +32,7 @@ pub fn create_temp_file() -> io::Result<File> {
         return Err(io::Error::from_raw_os_error(error_code as i32));
     }
 
-    Ok(unsafe { File::from_raw_handle(file_handle as std::os::windows::io::RawHandle) })
-}
+    let file = unsafe { File::from_raw_handle(file_handle as std::os::windows::io::RawHandle) };
 
-fn main() {
-    match create_temp_file() {
-        Ok(temp_file) => {
-            println!("Temporary file created");
-            // Use the temporary file...
-            drop(temp_file)
-        }
-        Err(e) => println!("Error creating temporary file: {}", e),
-    }
+    Ok((file, temp_dir))
 }

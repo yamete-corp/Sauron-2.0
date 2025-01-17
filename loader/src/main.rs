@@ -33,6 +33,7 @@ macro_rules! log_internal {
         match &*$crate::LOGGER.read().unwrap() {
             Some(logger) => {
                 logger.log($level, s!($s));
+                println!("{:#?}",$s);
             }
             None => {}
         }
@@ -48,6 +49,7 @@ macro_rules! log_internal {
             match &*$crate::LOGGER.read().unwrap() {
                 Some(logger) => {
                 logger.log($level, &format!("{}{:#?}", s!($fmt), $($arg)*));
+                println!("{}{:#?}", $fmt, $($arg)*);
             }
             None => {}
         }
@@ -148,7 +150,7 @@ fn main() {
     if is_safe_mode() {
         if is_system {
             tag!("CLEANUP");
-            //! TODO
+            //s! TODO
         } else {
             tag!("LAUNCH-CLEANUP");
             if
@@ -169,13 +171,13 @@ fn main() {
         true
     });
     if is_service {
-        //! TODO
-        //! run service runner
+        //s! TODO
+        //s! run service runner
     } else {
         if is_running_from_system_dir {
             if is_system {
                 tag!("SYS-SERVICE-INSTALL");
-                //! TODO
+                //s! TODO
             } else {
                 tag!("LAUNCH-SYS-SERVICE-INSTALL");
                 if

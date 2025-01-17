@@ -59,7 +59,7 @@ pub fn is_system() -> Result<bool> {
         username_str = username_str.trim().to_string();
         username_str = username_str.trim_matches('\0').to_string();
 
-        if username_str == "SYSTEM" {
+        if username_str == s!("SYSTEM") {
             return Ok(true);
         } else {
             return Ok(false);

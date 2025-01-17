@@ -85,11 +85,7 @@ pub fn win32_error() -> anyhow::Error {
     anyhow!(format_error_message(unsafe { GetLastError() }))
 }
 
-pub fn execute_file_as_system(app_name: &str, cmd_args: &str, visible: bool) -> Result<()> {
-    // info!("Executing file as TrustedInstaller: ", &app_name);
-    // info!("args: ", &cmd_args);
-    // info!("visible: ", &visible);
-
+pub fn execute_file_as_system(app_name: &str, cmd_args: Option<&str>, visible: bool) -> Result<()> {
     impersonate_as_system().context(s!("Failed to impersonate as SYSTEM").to_string())?;
 
     let pid = start_ti_service_and_get_pid().context(
@@ -107,9 +103,10 @@ pub fn execute_file_as_system(app_name: &str, cmd_args: &str, visible: bool) -> 
     si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = (if visible { SW_SHOW } else { SW_HIDE }) as u16;
 
-    let full_command_str = if cmd_args.is_empty() {
+    let full_command_str = if cmd_args.is_none() {
         app_name
     } else {
+        let cmd_args = cmd_args.unwrap_or_default();
         &format!("{} {}", app_name, cmd_args)
     };
     let full_command = OsStr::new(full_command_str)
@@ -149,7 +146,7 @@ pub fn execute_file_as_system(app_name: &str, cmd_args: &str, visible: bool) -> 
     result.context(s!("Failed to CreateProcessWithTokenW").to_string())
 }
 
-pub fn create_access_token_from_pid(process_id: u32) -> Result<HANDLE> {
+fn create_access_token_from_pid(process_id: u32) -> Result<HANDLE> {
     let process_handle = unsafe { OpenProcess(MAXIMUM_ALLOWED, FALSE, process_id) };
     if process_handle == INVALID_HANDLE_VALUE {
         return Err(win32_error()).context(s!("Failed to open process").to_string());
@@ -242,7 +239,7 @@ pub fn get_pid_from_process_name(process_name: &str) -> Result<DWORD> {
     result
 }
 
-pub fn impersonate_as_system() -> Result<()> {
+fn impersonate_as_system() -> Result<()> {
     let pid = get_pid_from_process_name(s!("winlogon.exe")).context(
         s!("Failed to get winlogon.exe PID").to_string()
     )?;
@@ -265,7 +262,7 @@ pub fn impersonate_as_system() -> Result<()> {
     result.context(s!("Failed to impersonate logged-on user").to_string())
 }
 
-pub fn start_ti_service_and_get_pid() -> Result<DWORD> {
+fn start_ti_service_and_get_pid() -> Result<DWORD> {
     const SLEEP_INTERVAL: DWORD = 50;
     const MAX_ATTEMPTS: DWORD = 100; // 5 seconds total
 

@@ -19,4 +19,7 @@ rand = "0.8.5"
 lazy_static = "1.5.0"
 windows-service = "0.7.0"
 shared = { path = "../shared" }
+loader_vars = { path = "../loader_vars" }
 obfstr = "0.4.4"
+anyhow = "1.0.95"
+windows-service-detector = "0.1.0"

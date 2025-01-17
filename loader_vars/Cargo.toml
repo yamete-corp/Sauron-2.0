@@ -17,3 +17,5 @@ debug-assertions = false
 panic = "abort"
 
 [dependencies]
+obfstr = "0.4.4"
+shared = { path = "../shared" }

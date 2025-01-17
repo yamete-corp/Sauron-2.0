@@ -4,6 +4,90 @@ use anyhow::{ Context, Result };
 use crate::utils::encryption::{ convert_key_to_bytes, encrypt_timestamp, sauron_encrypt };
 use obfstr::obfstr as s;
 
+#[macro_export]
+macro_rules! ref_log_internal {
+    ($logger:expr, $level:expr, $s:expr) => {
+        {
+            $logger.log($level, s!($s));
+        }
+    };
+
+    (
+        $logger:expr,
+        $level:expr,
+        $fmt:expr,
+        $($arg:tt)*
+    ) => {
+        {
+            $logger.log($level, &format!("{}{:#?}", s!($fmt), $($arg)*));
+            
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! ref_info {
+    ($logger:expr, $s:expr) => {
+        ref_log_internal!($logger, s!("INFO"), $s)
+    };
+    (
+        $logger:expr,
+        $fmt:expr,
+        $($arg:tt)*
+    ) => {
+        ref_log_internal!($logger, s!("INFO"), $fmt, $($arg)*)
+    };
+}
+
+#[macro_export]
+macro_rules! ref_warn {
+    ($logger:expr, $s:expr) => {
+        ref_log_internal!($logger, s!("WARN"), $s)
+    };
+    (
+        $logger:expr,
+        $fmt:expr,
+        $($arg:tt)*
+    ) => {
+        ref_log_internal!($logger, s!("WARN"), $fmt, $($arg)*)
+    };
+}
+
+#[macro_export]
+macro_rules! ref_err {
+    ($logger:expr, $s:expr) => {
+        ref_log_internal!($logger, s!("ERROR"), $s)
+    };
+    (
+        $logger:expr,
+        $fmt:expr,
+        $($arg:tt)*
+    ) => {
+        ref_log_internal!($logger, s!("ERROR"), $fmt, $($arg)*)
+    };
+}
+
+#[macro_export]
+macro_rules! ref_verbose {
+    ($logger:expr, $s:expr) => {
+        ref_log_internal!($logger, s!("VERBOSE"), $s)
+    };
+    (
+        $logger:expr,
+        $fmt:expr,
+        $($arg:tt)*
+    ) => {
+        ref_log_internal!($logger, s!("VERBOSE"), $fmt, $($arg)*)
+    };
+}
+
+#[macro_export]
+macro_rules! ref_tag {
+    ($logger:expr, $s:expr) => {
+        ref_log_internal!($logger, s!("TAG"), $s)
+    };
+}
+
 #[derive(Debug, Clone)]
 pub struct Logger {
     key: [u8; 32],

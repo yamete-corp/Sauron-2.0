@@ -125,3 +125,6 @@ pub fn exit_1() -> ! {
     std::thread::sleep(sleep_duration);
     std::process::exit(1);
 }
+pub fn exit_1_insta() -> ! {
+    std::process::exit(1);
+}

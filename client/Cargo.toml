@@ -12,6 +12,12 @@ codegen-units = 1
 debug-assertions = false
 panic = "abort"
 
+[package.metadata.cargo-post.dependencies]
+regex = "1.11.1"
+memmap2 = "0.9.5"
+walkdir = "2.5.0"
+rand = "0.8.5"
+
 [build-dependencies]
 rand = "0.8.5"
 

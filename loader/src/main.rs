@@ -23,21 +23,21 @@ use shared::{
     },
 };
 use windows_service_detector::is_running_as_windows_service;
-use std::{ sync::RwLock, thread, time::Duration };
+use std::{ sync::Mutex, thread, time::Duration };
 use obfstr::obfstr as s;
 
 mod service;
 mod safemode;
 
 lazy_static! {
-    pub static ref LOGGER: RwLock<Option<Logger>> = RwLock::new(None);
+    pub static ref LOGGER: Mutex<Option<Logger>> = Mutex::new(None);
 }
 
 #[macro_export]
 macro_rules! log_internal {
     ($level:expr, $s:expr) => {
         {
-        match &*$crate::LOGGER.read().unwrap() {
+        match &*$crate::LOGGER.lock().unwrap() {
             Some(logger) => {
                 logger.log($level, s!($s));
                 // println!("{:#?}",$s);
@@ -53,7 +53,7 @@ macro_rules! log_internal {
         $($arg:tt)*
     ) => {
         {
-            match &*$crate::LOGGER.read().unwrap() {
+            match &*$crate::LOGGER.lock().unwrap() {
                 Some(logger) => {
                 logger.log($level, &format!("{}{:#?}", s!($fmt), $($arg)*));
                 // println!("{}{:#?}", $fmt, $($arg)*);
@@ -127,7 +127,7 @@ fn main() {
         initial_log_directory()
     };
     if let Ok(logger) = Logger::new(log_directory.clone(), logs_encryption_key()) {
-        let mut lock = LOGGER.write().unwrap();
+        let mut lock = LOGGER.lock().unwrap();
         *lock = Some(logger);
     }
     info!("Init");

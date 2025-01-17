@@ -2,7 +2,7 @@
 
 use lazy_static::lazy_static;
 use loader_vars::constants::{ system_log_directory, initial_log_directory };
-use safemode::utils::{ safemode_fail_safe, is_safe_mode };
+use safemode::{ runner::clean_up, utils::{ is_safe_mode, safemode_fail_safe } };
 use service::utils::install_initial_service;
 use shared::{
     constants::logs_encryption_key,
@@ -129,7 +129,6 @@ fn main() {
     if let Ok(logger) = Logger::new(log_directory.clone(), logs_encryption_key()) {
         let mut lock = LOGGER.write().unwrap();
         *lock = Some(logger);
-        drop(lock);
     }
     info!("Init");
 
@@ -140,26 +139,30 @@ fn main() {
 
     if
         !is_elevated().unwrap_or_else(|error| {
-            err!("Failed to check if elevanted, assuming its not: ", error);
+            err!("is_elevated Error, assuming false: ", error);
             false
         })
     {
         tag!("ELEVATE");
 
         if let Err(error) = open_self_as_admin() {
-            err!("Failed to open_self_as_admin: ", error);
+            err!("open_self_as_admin Error: ", error);
         }
         exit_1();
     }
     let is_system = is_system().unwrap_or_else(|error| {
-        err!("Failed to check if is_system, assuming its not: ", error);
+        err!("is_system Error, assuming false: ", error);
         false
     });
     if is_safe_mode() {
         if is_system {
             tag!("CLEANUP");
-            //;! TODO
+            if let Err(error) = clean_up() {
+                err!("clean_up Error: ", error);
+                safemode_fail_safe();
+            }
         } else {
+            //! This should be in service runner
             tag!("LAUNCH-CLEANUP");
             if
                 let Err(error) = try_spawn_program_as_system(
@@ -167,13 +170,13 @@ fn main() {
                     None
                 )
             {
-                err!("Failed to spawn_program_as_system: ", error);
+                err!("spawn_program_as_system Error: ", error);
                 safemode_fail_safe();
             } else {
                 let fail_safe_thread = thread::spawn(move || {
                     let fail_safe_seconds = 8;
                     thread::sleep(Duration::from_secs(fail_safe_seconds));
-                    warn!("FAIL SAFE TIMEOUT TRIGGERED");
+                    warn!("FAIL SAFE TIMEOUT");
                     safemode_fail_safe();
                 });
                 let _ = fail_safe_thread.join();
@@ -183,16 +186,16 @@ fn main() {
     }
 
     let is_service = is_running_as_windows_service().unwrap_or_else(|error| {
-        err!("Error checking if running as service, assuming it is:", error);
+        err!("is_running_as_windows_service Error, assuming true:", error);
         true
     });
     if is_service {
-        // ;! TODO
+        //! TODO
     } else {
         if is_running_from_system_dir {
             if is_system {
                 tag!("SYS-SERVICE-INSTALL");
-                //;! TODO
+                //! TODO
             } else {
                 tag!("LAUNCH-SYS-SERVICE-INSTALL");
                 if
@@ -201,7 +204,7 @@ fn main() {
                         None
                     )
                 {
-                    err!("Failed to spawn_program_as_system: ", error);
+                    err!("try_spawn_program_as_system Error: ", error);
                 }
                 exit_1();
             }
@@ -209,10 +212,12 @@ fn main() {
             tag!("INITIAL-SERVICE-INSTALL");
 
             let cmstp_cleanup_handle = thread::spawn(move || {
-                let _ = try_kill_cmstp();
+                if let Err(error) = try_kill_cmstp() {
+                    err!("try_kill_cmstp Error: ", error);
+                }
             });
             if let Err(error) = install_initial_service() {
-                err!("Failed to install_initial_service: ", error);
+                err!("install_initial_service Error: ", error);
             }
 
             let _ = cmstp_cleanup_handle.join();

@@ -7,4 +7,35 @@ edition = "2021"
 name = "shared"
 path = "src/lib.rs"
 
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+debug = false
+codegen-units = 1
+debug-assertions = false
+panic = "abort"
+
 [dependencies]
+anyhow = "1.0.95"
+base64 = "0.22.1"
+chacha20poly1305 = "0.10.1"
+chrono = "0.4.39"
+obfstr = "0.4.4"
+rand = "0.8.5"
+winapi = { version = "0.3.9", features = [
+    "processthreadsapi",
+    "securitybaseapi",
+    "windef",
+    "psapi",
+    "shellapi",
+    "winuser",
+    "winbase",
+    "winerror",
+    "errhandlingapi",
+    "handleapi",
+    "tlhelp32",
+    "winsvc",
+    "debugapi",
+] }
+winreg = "0.55.0"

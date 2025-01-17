@@ -1,7 +1,11 @@
 [package]
-name = "loader"
+name = "loader_vars"
 version = "0.1.0"
 edition = "2021"
+
+[lib]
+name = "loader_vars"
+path = "src/lib.rs"
 
 [profile.release]
 opt-level = 3
@@ -12,11 +16,4 @@ codegen-units = 1
 debug-assertions = false
 panic = "abort"
 
-[build-dependencies]
-rand = "0.8.5"
-
 [dependencies]
-lazy_static = "1.5.0"
-windows-service = "0.7.0"
-shared = { path = "../shared" }
-obfstr = "0.4.4"

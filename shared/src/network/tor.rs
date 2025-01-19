@@ -20,20 +20,20 @@ pub struct TorHandler {
     stream_prefs: Arc<Mutex<StreamPrefs>>,
     stream: Option<StreamRef>,
     tcp_receive_poll_delay_ms: u64,
-    retry_connection_interval_ms: u64,
+    retry_connect_interval_ms: u64,
     retry_read_stream_interval_ms: u64,
-    logger: Arc<Mutex<Logger>>,
+    pub logger: Arc<Mutex<Logger>>,
 }
 
 impl TorHandler {
-    pub async fn new(log_directory: PathBuf, encryption_key: String) -> Result<Self> {
+    pub async fn new(log_directory: PathBuf, log_encryption_key: String) -> Result<Self> {
         let config = TorClientConfig::default();
         let tor_client = TorClient::create_bootstrapped(config).await.context(
             s!("Failed to create Tor client").to_string()
         )?;
         let mut stream_prefs: StreamPrefs = StreamPrefs::default();
         stream_prefs.connect_to_onion_services(arti_client::config::BoolOrAuto::Explicit(true));
-        let logger = Arc::new(Mutex::new(Logger::new(log_directory, encryption_key)?));
+        let logger = Arc::new(Mutex::new(Logger::new(log_directory, log_encryption_key)?));
         ref_tag!(logger.lock().unwrap(), "TOR-HANDLER");
 
         let tor_handler = TorHandler {
@@ -42,7 +42,7 @@ impl TorHandler {
             tor_client: Arc::new(Mutex::new(tor_client)),
             stream_prefs: Arc::new(Mutex::new(stream_prefs)),
             tcp_receive_poll_delay_ms: 100,
-            retry_connection_interval_ms: 5 * 60 * 1000, // 5 minutes
+            retry_connect_interval_ms: 5 * 60 * 1000, // 5 minutes
             retry_read_stream_interval_ms: 100,
         };
         Ok(tor_handler)
@@ -58,7 +58,7 @@ impl TorHandler {
 
         Ok(())
     }
-    pub async fn run<F>(&mut self, callback: F) -> Result<()>
+    pub async fn run<F>(&mut self, callback: F)
         where F: FnMut(&mut Self, Vec<u8>) -> Result<()> + Send + Sync + Copy + 'static
     {
         loop {
@@ -77,11 +77,11 @@ impl TorHandler {
                         ).await;
                     }
                 }
-                Err(error) => {
-                    ref_err!(self.logger.lock().unwrap(), "Failed to connect_to_endpoint: ", error);
+                Err(_error) => {
+                    ref_err!(self.logger.lock().unwrap(), "Failed to connect_to_endpoint");
                 }
             }
-            tokio::time::sleep(Duration::from_millis(self.retry_connection_interval_ms)).await;
+            tokio::time::sleep(Duration::from_millis(self.retry_connect_interval_ms)).await;
         }
     }
     async fn handle_receive<F>(&mut self, mut callback: F) -> Result<()>

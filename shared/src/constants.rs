@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-
 use obfstr::obfstr as s;
 use crate::utils::functions::system32_dir;
 

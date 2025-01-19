@@ -29,3 +29,5 @@ loader_vars = { path = "../loader_vars" }
 obfstr = "0.4.4"
 anyhow = "1.0.95"
 windows-service-detector = "0.1.0"
+serde_json = "1.0.135"
+tokio = "1.43.0"

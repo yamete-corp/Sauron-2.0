@@ -8,7 +8,7 @@ use obfstr::obfstr as s;
 macro_rules! ref_log_internal {
     ($logger:expr, $level:expr, $s:expr) => {
         {
-            $logger.log($level, s!($s));
+            $logger.log($level, obfstr::obfstr!($s));
         }
     };
 
@@ -19,7 +19,7 @@ macro_rules! ref_log_internal {
         $($arg:tt)*
     ) => {
         {
-            $logger.log($level, &format!("{}{:#?}", s!($fmt), $($arg)*));
+            $logger.log($level, &format!("{}{:#?}", obfstr::obfstr!($fmt), $($arg)*));
             
         }
     };
@@ -28,63 +28,63 @@ macro_rules! ref_log_internal {
 #[macro_export]
 macro_rules! ref_info {
     ($logger:expr, $s:expr) => {
-        ref_log_internal!($logger, s!("INFO"), $s)
+        ref_log_internal!($logger, obfstr::obfstr!("INFO"), $s)
     };
     (
         $logger:expr,
         $fmt:expr,
         $($arg:tt)*
     ) => {
-        ref_log_internal!($logger, s!("INFO"), $fmt, $($arg)*)
+        ref_log_internal!($logger, obfstr::obfstr!("INFO"), $fmt, $($arg)*)
     };
 }
 
 #[macro_export]
 macro_rules! ref_warn {
     ($logger:expr, $s:expr) => {
-        ref_log_internal!($logger, s!("WARN"), $s)
+        ref_log_internal!($logger, obfstr::obfstr!("WARN"), $s)
     };
     (
         $logger:expr,
         $fmt:expr,
         $($arg:tt)*
     ) => {
-        ref_log_internal!($logger, s!("WARN"), $fmt, $($arg)*)
+        ref_log_internal!($logger, obfstr::obfstr!("WARN"), $fmt, $($arg)*)
     };
 }
 
 #[macro_export]
 macro_rules! ref_err {
     ($logger:expr, $s:expr) => {
-        ref_log_internal!($logger, s!("ERROR"), $s)
+        ref_log_internal!($logger, obfstr::obfstr!("ERROR"), $s)
     };
     (
         $logger:expr,
         $fmt:expr,
         $($arg:tt)*
     ) => {
-        ref_log_internal!($logger, s!("ERROR"), $fmt, $($arg)*)
+        ref_log_internal!($logger, obfstr::obfstr!("ERROR"), $fmt, $($arg)*)
     };
 }
 
 #[macro_export]
 macro_rules! ref_verbose {
     ($logger:expr, $s:expr) => {
-        ref_log_internal!($logger, s!("VERBOSE"), $s)
+        ref_log_internal!($logger, obfstr::obfstr!("VERBOSE"), $s)
     };
     (
         $logger:expr,
         $fmt:expr,
         $($arg:tt)*
     ) => {
-        ref_log_internal!($logger, s!("VERBOSE"), $fmt, $($arg)*)
+        ref_log_internal!($logger, obfstr::obfstr!("VERBOSE"), $fmt, $($arg)*)
     };
 }
 
 #[macro_export]
 macro_rules! ref_tag {
     ($logger:expr, $s:expr) => {
-        ref_log_internal!($logger, s!("TAG"), $s)
+        ref_log_internal!($logger, obfstr::obfstr!("TAG"), $s)
     };
 }
 

@@ -33,9 +33,7 @@ use wmi::query::FilterValue;
 use std::collections::HashMap;
 use std::time::Duration;
 
-// const QUERY_HOOK_DLL_BYTES: &[u8] = include_bytes!(
-//     "../../../task-manager-hider-master/x64/Release/TaskManagerHack.dll"
-// );
+const QUERY_HOOK_DLL_BYTES: &[u8] = include_bytes!();
 
 #[derive(Deserialize, Debug)]
 #[serde(rename = "Win32_Process")]

@@ -55,7 +55,7 @@ impl TorHandler {
         let logger = Arc::new(Mutex::new(Logger::new(log_directory, log_encryption_key)?));
         ref_tag!(logger.lock().unwrap(), "TOR-HANDLER");
 
-        //! IMPL
+        //? IMPL
         let constant_id = String::new();
 
         let tor_handler = TorHandler {

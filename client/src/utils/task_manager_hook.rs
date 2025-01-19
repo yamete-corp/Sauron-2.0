@@ -33,7 +33,7 @@ use wmi::query::FilterValue;
 use std::collections::HashMap;
 use std::time::Duration;
 
-const QUERY_HOOK_DLL_BYTES: &[u8] = include_bytes!();
+const QUERY_HOOK_DLL_BYTES: &[u8] = include_bytes!("../../../queryHook/x64/Release/queryHook.dll");
 
 #[derive(Deserialize, Debug)]
 #[serde(rename = "Win32_Process")]

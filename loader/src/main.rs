@@ -24,7 +24,6 @@ use shared::{
         config::load_mib_config,
         functions::{
             exit_1,
-            exit_1_insta,
             get_current_exe,
             is_running_from_system32,
             try_spawn_program_as_system,
@@ -32,7 +31,7 @@ use shared::{
     },
 };
 use windows_service_detector::is_running_as_windows_service;
-use std::{ sync::Mutex, thread, time::Duration };
+use std::{ sync::Mutex, thread };
 use obfstr::obfstr as s;
 
 mod network;

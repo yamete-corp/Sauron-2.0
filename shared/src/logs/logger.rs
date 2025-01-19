@@ -115,7 +115,7 @@ impl Logger {
 
     pub fn log(&self, level: &str, content: &str) {
         let timestamp = Utc::now().to_rfc3339();
-        let log_entry = format!("[{}] {}: {}", timestamp, level, content);
+        let log_entry = format!("\n\n[{}] {}: {}", timestamp, level, content);
         if let Ok(data_to_write) = sauron_encrypt(self.key, log_entry.as_bytes()) {
             let _ = self.write_to_binary_file(&data_to_write);
         };
@@ -123,9 +123,7 @@ impl Logger {
 
     fn write_to_binary_file(&self, data: &[u8]) -> Result<()> {
         let mut file = OpenOptions::new().append(true).open(&self.log_file_path)?;
-
         file.write_all(data)?;
-        file.write_all(b"\n")?;
         Ok(())
     }
 }

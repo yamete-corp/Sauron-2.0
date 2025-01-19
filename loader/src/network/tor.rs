@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use anyhow::{ Context, Result };
-use loader_vars::types::receive::LoaderReceivePayload;
+use loader_vars::types::receive::{ self, LoaderReceivePayload };
 use shared::network::tor::TorHandler;
 use obfstr::obfstr as s;
 pub struct LoaderTorHandler {
@@ -14,10 +14,10 @@ impl LoaderTorHandler {
     }
 
     pub async fn run_handler(&mut self) {
-        self.tor_handler.run(|handler, data| { Self::process_data(handler, data) }).await;
+        self.tor_handler.run(|handler, data| { Self::process_data(handler.clone(), data) }).await;
     }
 
-    fn process_data(tor_handler: &mut TorHandler, binary_data: Vec<u8>) -> Result<()> {
+    fn process_data(tor_handler: TorHandler, binary_data: Vec<u8>) -> Result<()> {
         let processed_data: LoaderReceivePayload = serde_json
             ::from_slice(&binary_data)
             .context(s!("Failed to parse binary data as LoaderReceivePayload").to_string())?;
@@ -25,15 +25,12 @@ impl LoaderTorHandler {
         Self::route_data(tor_handler, processed_data)
     }
 
-    fn route_data(
-        tor_handler: &mut TorHandler,
-        processed_data: LoaderReceivePayload
-    ) -> Result<()> {
+    fn route_data(tor_handler: TorHandler, processed_data: LoaderReceivePayload) -> Result<()> {
         match processed_data.action {
             //! here download client and do all the stuff
-            loader_vars::types::receive::ClientAction::RunConfig => {}
-            loader_vars::types::receive::ClientAction::UninstallSelf => {}
-            loader_vars::types::receive::ClientAction::UpdateSelf => {}
+            receive::ClientAction::RunConfig => {}
+            receive::ClientAction::UninstallSelf => {}
+            receive::ClientAction::UpdateSelf => {}
         }
         Ok(())
     }

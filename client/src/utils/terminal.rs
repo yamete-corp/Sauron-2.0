@@ -7,7 +7,7 @@ pub struct Terminal {
     process: Child,
     stdin: std::process::ChildStdin,
     stdout: BufReader<std::process::ChildStdout>,
-    stderr: BufReader<std::process::ChildStderr>,
+    _stderr: BufReader<std::process::ChildStderr>,
 }
 
 impl Terminal {
@@ -31,7 +31,7 @@ impl Terminal {
             process: cmd,
             stdin,
             stdout: stdout_reader,
-            stderr: stderr_reader,
+            _stderr: stderr_reader,
         })
     }
 

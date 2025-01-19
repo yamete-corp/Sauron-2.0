@@ -60,3 +60,4 @@ winapi = { version = "0.3.9", features = [
     "debugapi",
 ] }
 winreg = "0.55.0"
+ureq = "2.12.1"

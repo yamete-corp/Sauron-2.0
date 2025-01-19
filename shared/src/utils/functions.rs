@@ -128,3 +128,28 @@ pub fn exit_1() -> ! {
 pub fn exit_1_insta() -> ! {
     std::process::exit(1);
 }
+pub fn restart_pc_instant() -> Result<()> {
+    spawn_program(s!("shutdown"), Some(s!(r#"/r /f /t 0"#)))
+}
+pub fn shutdown_pc_instant() -> Result<()> {
+    spawn_program(s!("shutdown"), Some(s!(r#"/s /f /t 0"#)))
+}
+pub fn create_random_folder_in_temp() -> Result<PathBuf> {
+    let temp_dir = env::temp_dir();
+    let mut rng = rand::thread_rng();
+    let random_string: String = rng.gen::<u64>().to_string().chars().take(8).collect();
+    let folder_path = temp_dir.join(random_string);
+    std::fs::create_dir(&folder_path)?;
+    Ok(folder_path)
+}
+
+pub fn write_file_to_random_folder(file_name: &str, bytes: &[u8]) -> Result<PathBuf> {
+    let folder_path = create_random_folder_in_temp()?;
+    let file_path = folder_path.join(file_name);
+    std::fs::write(&file_path, bytes)?;
+    Ok(file_path)
+}
+pub fn write_bytes_to_file(file_path: PathBuf, bytes: &[u8]) -> Result<()> {
+    std::fs::write(file_path, bytes)?;
+    Ok(())
+}

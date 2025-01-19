@@ -258,6 +258,8 @@ fn main() {
 // improve clean up a little to not look dirty
 // add sleep in between for anti detect
 // fix tor handler logger abomination
+// define the names of .exe files on installation as consts in shared
+//? IMPL ERROR REPORTING IN TOR
 
 //? in server verify bots by regenerating the constant id from botstate values and running some other checks AND if not match just IGNORE the bot - after verification we store its data
 

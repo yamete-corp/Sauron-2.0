@@ -21,7 +21,7 @@ pub type SendQueue = MutexPtr<VecDeque<Vec<u8>>>;
 
 #[derive(Clone)]
 pub struct TorHandler {
-    pub logger: MutexPtr<Logger>,
+    pub logger: MutexPtr<Option<Logger>>,
     pub constant_device_id: RwPtr<String>,
     tor_client: TorClientRef,
     stream_prefs: RwPtr<StreamPrefs>,
@@ -43,17 +43,28 @@ pub enum ServerReceiveType {
     Loader,
     Boogeyman,
 }
-
+pub enum LoggerConfig {
+    Existing(Option<Logger>),
+    New {
+        log_directory: PathBuf,
+        log_encryption_key: String,
+    },
+}
 impl TorHandler {
-    pub async fn new(log_directory: PathBuf, log_encryption_key: String) -> Result<Self> {
+    pub async fn new(logger_config: LoggerConfig) -> Result<Self> {
         let config = TorClientConfig::default();
         let tor_client = TorClient::create_bootstrapped(config).await.context(
             s!("Failed to create Tor client").to_string()
         )?;
         let mut stream_prefs: StreamPrefs = StreamPrefs::default();
+        let logger = match logger_config {
+            LoggerConfig::Existing(logger) => logger,
+            LoggerConfig::New { log_directory, log_encryption_key } =>
+                Some(Logger::new(log_directory, log_encryption_key)?),
+        };
         stream_prefs.connect_to_onion_services(arti_client::config::BoolOrAuto::Explicit(true));
-        let logger = Arc::new(Mutex::new(Logger::new(log_directory, log_encryption_key)?));
-        ref_tag!(logger.lock().unwrap(), "TOR-HANDLER");
+        let logger = Arc::new(Mutex::new(logger));
+        // ref_tag!(logger.lock().unwrap(), "TOR-HANDLER");
 
         //? IMPL
         let constant_id = String::new();
@@ -95,11 +106,11 @@ impl TorHandler {
                 Ok(()) => {
                     loop {
                         if let Err(error) = self.handle_receive(callback).await {
-                            ref_err!(
-                                self.logger.lock().unwrap(),
-                                "Failed to handle_receive: ",
-                                error
-                            );
+                            // ref_err!(
+                            //     self.logger.lock().unwrap(),
+                            //     "Failed to handle_receive: ",
+                            //     error
+                            // );
                         }
                         tokio::time::sleep(
                             Duration::from_millis(
@@ -109,7 +120,7 @@ impl TorHandler {
                     }
                 }
                 Err(_error) => {
-                    ref_err!(self.logger.lock().unwrap(), "Failed to connect_to_endpoint");
+                    // ref_err!(self.logger.lock().unwrap(), "Failed to connect_to_endpoint");
                 }
             }
             tokio::time::sleep(
@@ -134,11 +145,11 @@ impl TorHandler {
                     )
                 {
                     if let Err(error) = callback(&mut self_clone, decrypted_data) {
-                        ref_err!(
-                            self_clone.logger.lock().unwrap(),
-                            "Failed to process data via callback: ",
-                            error
-                        );
+                        // ref_err!(
+                        //     self_clone.logger.lock().unwrap(),
+                        //     "Failed to process data via callback: ",
+                        //     error
+                        // );
                     };
                 }
             });
@@ -172,7 +183,7 @@ impl TorHandler {
             let mut queue = self.send_queue.lock().unwrap();
             while let Some(data) = queue.pop_front() {
                 if let Err(_error) = self.encrypt_and_send(&data).await {
-                    ref_err!(self.logger.lock().unwrap(), "Failed to encrypt_and_send");
+                    // ref_err!(self.logger.lock().unwrap(), "Failed to encrypt_and_send");
                 }
             }
         }

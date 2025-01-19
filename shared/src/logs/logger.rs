@@ -8,7 +8,8 @@ use obfstr::obfstr as s;
 macro_rules! ref_log_internal {
     ($logger:expr, $level:expr, $s:expr) => {
         {
-            $logger.log($level, obfstr::obfstr!($s));
+            if let Some(logger) = $logger {
+            $logger.log($level, obfstr::obfstr!($s));}
         }
     };
 

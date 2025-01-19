@@ -1,20 +1,12 @@
 use std::{
-    fs::create_dir_all,
-    io::{ Read, Write },
     os::windows::process::CommandExt,
     path::PathBuf,
     process::Command,
     sync::{ Arc, Mutex, RwLock },
 };
-
 use anyhow::{ Context, Result };
 use client_vars::{
-    constants::{
-        client_tag,
-        client_version,
-        default_query_hook_exclusions,
-        query_hook_exclusions_file_path,
-    },
+    constants::{ client_tag, client_version },
     types::{
         receive::{ self, BoogeymanReceivePayload, ClientParams },
         send::{ self, BoogeymanSendPayload, InitParams, ServerAction, ServerParams },
@@ -33,7 +25,6 @@ use crate::{
         terminal::Terminal,
     },
 };
-
 use super::basic::download_file_to_path;
 
 #[derive(Clone)]

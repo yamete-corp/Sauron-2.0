@@ -159,5 +159,3 @@ async fn main() {
 //? in new vm via tor create many accounts
 //? add threads and generate extensions
 //? then simply upload and rank each 5 star
-
-//* code to add callback to send init config on connect */

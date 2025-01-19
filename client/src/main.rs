@@ -5,7 +5,7 @@ use client_vars::constants::log_directory;
 use obfstr::obfstr as s;
 use shared::{
     constants::logs_encryption_key,
-    logs::logger::{ self, Logger },
+    logs::logger::Logger,
     uac::checks::is_system,
     utils::{ anti_tampering::is_clean, config::load_mib_config, functions::exit_1 },
 };
@@ -136,5 +136,3 @@ async fn main() {
         }
     });
 }
-
-// rewrite dll hook and include in the project the folder

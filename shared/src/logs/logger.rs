@@ -1,4 +1,10 @@
-use std::{ fs::{ create_dir_all, File, OpenOptions }, io::Write, path::PathBuf };
+use std::{
+    fs::{ create_dir_all, File, OpenOptions },
+    io::Write,
+    os::windows::fs::MetadataExt,
+    path::PathBuf,
+    sync::{ Arc, Mutex },
+};
 use chrono::Utc;
 use anyhow::{ Context, Result };
 use crate::utils::encryption::{ convert_key_to_bytes, encrypt_timestamp, sauron_encrypt };
@@ -8,8 +14,9 @@ use obfstr::obfstr as s;
 macro_rules! ref_log_internal {
     ($logger:expr, $level:expr, $s:expr) => {
         {
-            if let Some(logger) = $logger {
-            $logger.log($level, obfstr::obfstr!($s));}
+           
+            $logger.log($level, obfstr::obfstr!($s));
+            
         }
     };
 
@@ -115,8 +122,14 @@ impl Logger {
     }
 
     pub fn log(&self, level: &str, content: &str) {
+        let file_size = self.get_file_size();
+        if file_size > 5 * 1024 * 1024 {
+            // 5 mb exceeded - end
+            return;
+        }
         let timestamp = Utc::now().to_rfc3339();
         let log_entry = format!("\n\n[{}] {}: {}", timestamp, level, content);
+
         if let Ok(data_to_write) = sauron_encrypt(self.key, log_entry.as_bytes()) {
             let _ = self.write_to_binary_file(&data_to_write);
         };
@@ -126,5 +139,11 @@ impl Logger {
         let mut file = OpenOptions::new().append(true).open(&self.log_file_path)?;
         file.write_all(data)?;
         Ok(())
+    }
+    fn get_file_size(&self) -> u64 {
+        std::fs
+            ::metadata(&self.log_file_path)
+            .map(|metadata| metadata.file_size())
+            .unwrap_or(0)
     }
 }

@@ -2,7 +2,7 @@ use std::{ collections::VecDeque, path::PathBuf, sync::{ Arc, Mutex, RwLock }, t
 use anyhow::{ Context, Result };
 use arti_client::{ DataStream, StreamPrefs, TorClient, TorClientConfig };
 use obfstr::obfstr as s;
-use crate::utils::encryption::sauron_encrypt;
+use crate::{ ref_tag, utils::{ encryption::sauron_encrypt, functions::fetch_constant_device_id } };
 use crate::{
     constants::{ communication_encryption_key, onion_endpoint },
     logs::logger::Logger,
@@ -10,6 +10,7 @@ use crate::{
 };
 use tokio::{ io::{ AsyncReadExt, AsyncWriteExt }, time::interval };
 use serde::{ Deserialize, Serialize };
+use crate::ref_log_internal;
 
 pub type RwPtr<T> = Arc<RwLock<T>>;
 pub type MutexPtr<T> = Arc<Mutex<T>>;
@@ -61,16 +62,15 @@ impl TorHandler {
             LoggerConfig::New { log_directory, log_encryption_key } =>
                 Some(Logger::new(log_directory, log_encryption_key)?),
         };
+        if let Some(lg) = &logger {
+            ref_tag!(lg, "TOR-HANDLER");
+        }
         stream_prefs.connect_to_onion_services(arti_client::config::BoolOrAuto::Explicit(true));
         let logger = Arc::new(Mutex::new(logger));
-        // ref_tag!(logger.lock().unwrap(), "TOR-HANDLER");
-
-        //? IMPL
-        let constant_id = String::new();
 
         let tor_handler = TorHandler {
             stream: None,
-            constant_device_id: Arc::new(RwLock::new(constant_id)),
+            constant_device_id: Arc::new(RwLock::new(fetch_constant_device_id())),
             send_queue: Arc::new(Mutex::new(VecDeque::new())),
             logger,
             tor_client: Arc::new(Mutex::new(tor_client)),
@@ -115,6 +115,9 @@ impl TorHandler {
                             //     "Failed to handle_receive: ",
                             //     error
                             // );
+
+                            // so we will try reconnect to endpoint again after interval
+                            break;
                         }
                         tokio::time::sleep(
                             Duration::from_millis(
@@ -171,7 +174,15 @@ impl TorHandler {
 
         let mut stream = read_stream_ref.lock().unwrap();
         stream.wait_for_connection().await?;
-        let data_length = stream.read_u32_le().await?;
+
+        let data_length = match stream.read_u32_le().await {
+            Ok(length) => length,
+            Err(_error) => {
+                // means not our protocol message
+                // assume its conn close
+                return Err(anyhow::anyhow!(s!("?Connection closed by server?").to_owned()));
+            }
+        };
 
         let mut data_buf = vec![0; data_length as usize];
         stream

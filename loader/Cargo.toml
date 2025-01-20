@@ -29,5 +29,5 @@ shared = { path = "../shared" }
 loader_vars = { path = "../loader_vars" }
 obfstr = "0.4.4"
 anyhow = "1.0.95"
-serde_json = "1.0.136"
+serde_json = "1.0.137"
 tokio = "1.43.0"

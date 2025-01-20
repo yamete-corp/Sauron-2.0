@@ -47,7 +47,7 @@ winapi = { version = "0.3.9", features = [
     # "debugapi",
     "memoryapi",
 ] }
-serde_json = "1.0.136"
+serde_json = "1.0.137"
 sysinfo = "0.33.1"
 screenshots = "0.8.10"
 reqwest = "0.12.12"

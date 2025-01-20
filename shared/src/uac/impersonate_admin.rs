@@ -106,8 +106,8 @@ RunPreSetupCommands=RunPreSetupCommandsSection
 "HKLM", "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\CMMGR32.EXE", "ProfileInstallPath", "%UnexpectedError%", "")
 
 [Strings]
-ServiceName="Connect"
-ShortSvcName="Connect"
+ServiceName="Network"
+ShortSvcName="Network"
 "#
         )
     );

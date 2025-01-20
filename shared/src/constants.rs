@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use obfstr::obfstr as s;
-use crate::utils::functions::system32_dir;
+use crate::utils::functions::{ programdata_dir, system32_dir };
 
 pub fn get_mib_config_path() -> PathBuf {
     system32_dir().join(s!("mib.xml"))
@@ -26,4 +26,13 @@ pub fn system_loader_exe_name() -> String {
 }
 pub fn vscode_initial_loader_exe_name() -> String {
     s!("llvm86.exe").to_owned()
+}
+pub fn get_fingerprint_dir() -> PathBuf {
+    programdata_dir().join(s!("cwl")).join(s!("reg.1de4eec8-1241"))
+}
+pub fn get_initial_install_dir() -> PathBuf {
+    programdata_dir().join(s!("cwl")).join(s!("shaders"))
+}
+pub fn get_loader_install_lock_dir() -> PathBuf {
+    programdata_dir().join(s!("s82vQh")).join(s!("Local"))
 }

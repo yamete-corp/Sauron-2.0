@@ -3,7 +3,6 @@ use std::{
     io::Write,
     os::windows::fs::MetadataExt,
     path::PathBuf,
-    sync::{ Arc, Mutex },
 };
 use chrono::Utc;
 use anyhow::{ Context, Result };

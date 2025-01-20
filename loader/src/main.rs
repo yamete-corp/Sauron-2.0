@@ -24,7 +24,6 @@ use shared::{
         config::load_mib_config,
         functions::{
             exit_1,
-            exit_1_insta,
             get_current_exe,
             is_running_from_system32,
             try_spawn_program_as_system,

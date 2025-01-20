@@ -1,5 +1,4 @@
 use serde::{ Deserialize, Serialize };
-use obfstr::obfstr as s;
 use crate::constants::{
     hardcoded_client_fallback_source,
     hardcoded_client_version,

@@ -24,7 +24,7 @@ use shared::utils::functions::{
     is_running_from_system32,
     try_spawn_program_as_system,
 };
-use std::fs::{ create_dir_all, remove_dir, remove_dir_all };
+use std::fs::{ create_dir_all, remove_dir_all };
 use std::{ ffi::OsString, thread, time::Duration };
 use windows_service::{
     define_windows_service,

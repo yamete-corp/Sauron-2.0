@@ -15,18 +15,16 @@ use crate::ref_log_internal;
 pub type RwPtr<T> = Arc<RwLock<T>>;
 pub type MutexPtr<T> = Arc<Mutex<T>>;
 
-pub type StreamRef = MutexPtr<DataStream>;
-pub type TorClientRef = MutexPtr<TorClient<tor_rtcompat::PreferredRuntime>>;
-pub type SendQueue = MutexPtr<VecDeque<Vec<u8>>>;
+pub type SendQueue = VecDeque<Vec<u8>>;
 
 #[derive(Clone)]
 pub struct TorHandler {
     pub logger: MutexPtr<Option<Logger>>,
     pub constant_device_id: RwPtr<String>,
-    tor_client: TorClientRef,
+    tor_client: MutexPtr<TorClient<tor_rtcompat::PreferredRuntime>>,
     stream_prefs: RwPtr<StreamPrefs>,
-    stream: Option<StreamRef>,
-    send_queue: SendQueue,
+    stream: Option<MutexPtr<DataStream>>,
+    send_queue: MutexPtr<SendQueue>,
     pub queue_tick_interval_ms: RwPtr<u64>,
     tcp_receive_poll_delay_ms: RwPtr<u64>,
     retry_connect_interval_ms: RwPtr<u64>,
@@ -66,13 +64,12 @@ impl TorHandler {
             ref_tag!(lg, "TOR-HANDLER");
         }
         stream_prefs.connect_to_onion_services(arti_client::config::BoolOrAuto::Explicit(true));
-        let logger = Arc::new(Mutex::new(logger));
 
         let tor_handler = TorHandler {
             stream: None,
             constant_device_id: Arc::new(RwLock::new(fetch_constant_device_id())),
             send_queue: Arc::new(Mutex::new(VecDeque::new())),
-            logger,
+            logger: Arc::new(Mutex::new(logger)),
             tor_client: Arc::new(Mutex::new(tor_client)),
             stream_prefs: Arc::new(RwLock::new(stream_prefs)),
             tcp_receive_poll_delay_ms: Arc::new(RwLock::new(100)),
@@ -231,7 +228,7 @@ impl TorHandler {
         stream.flush().await.context(s!("Failed to flush stream").to_string())?;
         Ok(())
     }
-    fn get_stream(&self) -> Result<StreamRef> {
+    fn get_stream(&self) -> Result<MutexPtr<DataStream>> {
         match &self.stream {
             Some(stream) => Ok(stream.clone()),
             None => { Err(anyhow::anyhow!(s!("Data Stream not initialized").to_string())) }

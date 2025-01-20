@@ -8,7 +8,6 @@ use winapi::um::processthreadsapi::GetCurrentProcess;
 use winapi::um::debugapi::{ CheckRemoteDebuggerPresent, IsDebuggerPresent };
 use obfstr::obfstr as s;
 use crate::constants::get_fingerprint_dir;
-
 use super::functions::get_current_exe_dir;
 // use winapi::um::libloaderapi::GetModuleHandleA;
 // use inside_vm::inside_vm;

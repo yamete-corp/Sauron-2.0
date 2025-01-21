@@ -52,7 +52,7 @@ pub fn app() -> Html {
 
     html! {
         <main class="container">
-            <h1>{"Welcome to Tauri + Yew"}</h1>
+            <h1>{"MAIN"}</h1>
 
             <div class="row">
                 <a href="https://tauri.app" target="_blank">

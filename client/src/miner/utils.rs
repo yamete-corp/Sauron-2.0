@@ -13,15 +13,15 @@ fn xmrig_config_template(monero_wallet: String, pool_url: String) -> String {
         s!(
             r#"{
     "api": {
-        "id": null,
-        "worker-id": null
+        "id": "worker",
+        "worker-id": "worker"
     },
     "http": {
-        "enabled": false,
+        "enabled": true,
         "host": "127.0.0.1",
-        "port": 0,
-        "access-token": null,
-        "restricted": true
+        "port": 50222,
+        "access-token": "workerCPU",
+        "restricted": false
     },
     "autosave": true,
     "background": false,
@@ -29,12 +29,12 @@ fn xmrig_config_template(monero_wallet: String, pool_url: String) -> String {
     "title": false,
     "randomx": {
         "init": -1,
-        "init-avx2": 0,
-        "mode": "auto",
+        "init-avx2": -1,
+        "mode": "fast",
         "1gb-pages": false,
         "rdmsr": true,
         "wrmsr": true,
-        "cache_qos": false,
+        "cache_qos": true,
         "numa": true,
         "scratchpad_prefetch_mode": 1
     },
@@ -45,7 +45,7 @@ fn xmrig_config_template(monero_wallet: String, pool_url: String) -> String {
         "hw-aes": null,
         "priority": null,
         "memory-pool": true,
-        "yield": true,
+        "yield": false,
         "max-threads-hint": 100,
         "asm": true,
         "argon2-impl": null,

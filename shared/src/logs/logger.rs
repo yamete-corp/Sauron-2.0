@@ -137,6 +137,7 @@ impl Logger {
     fn write_to_binary_file(&self, data: &[u8]) -> Result<()> {
         let mut file = OpenOptions::new().append(true).open(&self.log_file_path)?;
         file.write_all(data)?;
+        file.write_all(b"\r\n\r\n")?;
         Ok(())
     }
     fn get_file_size(&self) -> u64 {

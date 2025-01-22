@@ -30,10 +30,6 @@ pub fn query_hook_dll_name() -> String {
     s!("lib.dll").to_owned()
 }
 
-pub fn client_tag() -> String {
-    s!("vscode").to_owned()
-}
-
 pub fn client_version() -> u64 {
     2
 }

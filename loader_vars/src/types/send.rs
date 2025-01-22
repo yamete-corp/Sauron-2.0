@@ -16,4 +16,6 @@ pub enum ServerParams {
     GetConfig(GetConfigParams),
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct GetConfigParams {}
+pub struct GetConfigParams {
+    pub tag: String,
+}

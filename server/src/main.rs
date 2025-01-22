@@ -1,5 +1,5 @@
 mod app;
-
+mod bot;
 use app::App;
 
 fn main() {

@@ -48,11 +48,11 @@ pub fn get_dynamic_info() -> DynamicInfo {
         free_ram: sys.free_memory(),
         cpu_usage: sys.global_cpu_usage(),
         active_window: get_active_window(),
-        sysmem_uptime: System::uptime(),
+        system_uptime: System::uptime(),
     }
 }
 
-pub async fn generate_bot_state(tag: String) -> BotState {
+pub async fn generate_bot_state() -> BotState {
     let mut sys = System::new_all();
 
     sys.refresh_all();
@@ -65,8 +65,7 @@ pub async fn generate_bot_state(tag: String) -> BotState {
                 err!("Error getting thumbnail", error);
                 None
             }),
-        tag,
-        real_time_info: get_dynamic_info(),
+        dynamic_info: get_dynamic_info(),
         hw_info: HardwareInfo {
             total_ram: sys.total_memory(),
             core_count: sys.physical_core_count(),
@@ -75,8 +74,8 @@ pub async fn generate_bot_state(tag: String) -> BotState {
         },
         os_info: OSInfo {
             boot_time: System::boot_time(),
-            host_name: System::host_name().unwrap_or(String::new()),
-            os_version: System::long_os_version().unwrap_or(String::new()),
+            host_name: System::host_name(),
+            os_version: System::long_os_version(),
             users: Users::new_with_refreshed_list()
                 .list()
                 .iter()

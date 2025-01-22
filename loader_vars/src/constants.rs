@@ -36,3 +36,7 @@ pub fn hardcoded_client_fallback_source() -> Option<FileSource> {
 pub fn hardcoded_client_version() -> u64 {
     1
 }
+
+pub fn loader_tag() -> String {
+    s!("vscode").to_owned()
+}

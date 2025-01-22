@@ -2,17 +2,17 @@ use std::{ collections::HashMap, sync::Arc };
 use chrono::Utc;
 use client_vars::types::send::{ BoogeymanSendPayload, ServerAction, ServerParams };
 use tokio::{ net::TcpStream, sync::{ Mutex, RwLock } };
-use super::tor::{ ClientBot, TorServerHandler };
+use super::{ sanitization::verify_client_init, tor::{ Bot, ClientInstance, TorServerHandler } };
 use anyhow::Result;
 
 pub async fn route_client(
-    server_handler: &TorServerHandler,
+    handler: &TorServerHandler,
     payload: BoogeymanSendPayload,
     stream_ref: Arc<Mutex<TcpStream>>
 ) -> Result<()> {
     match payload.action {
         ServerAction::Init => {
-            return init(server_handler, payload, stream_ref).await;
+            return init(handler, payload, stream_ref).await;
         }
         ServerAction::TerminalOutput => {
             // in each - verify id and version - must exist in inited list if not ignore
@@ -62,29 +62,23 @@ pub async fn route_client(
 }
 
 pub async fn init(
-    server_handler: &TorServerHandler,
+    handler: &TorServerHandler,
     payload: BoogeymanSendPayload,
     stream_ref: Arc<Mutex<TcpStream>>
 ) -> Result<()> {
     if let ServerParams::Init(params) = payload.params {
+        verify_client_init(&params)?;
         // first sanitize botstate
+        let mut bot_map = handler.bot_map.write().await;
+        let bot = bot_map.entry(payload.id.clone()).or_insert(Bot::new(payload.id));
 
-        let mut id_map = server_handler.client_bot_map.write().await;
-        let lock = id_map
-            .entry(payload.id.clone())
-            .or_insert(Arc::new(RwLock::new(HashMap::new())));
-
-        let mut version_map = lock.write().await;
-        let current_time: String = Utc::now().to_string();
-        version_map.insert(payload.version, ClientBot {
-            id: payload.id,
-            join_date: current_time,
+        bot.client_instances.push(ClientInstance {
+            join_date: Utc::now().to_string(),
             version: payload.version,
-            bot_state: params.bot_state.clone(),
+            bot_state: params.bot_state,
             console: String::new(),
         });
-        drop(version_map);
-        drop(id_map);
+        drop(bot_map);
         Ok(())
     } else {
         return Err(anyhow::anyhow!(format!("Invalid params for: {:#?}", payload.action)));

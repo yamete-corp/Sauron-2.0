@@ -6,7 +6,7 @@ use std::{
 };
 use anyhow::{ Context, Result };
 use client_vars::{
-    constants::{ client_tag, client_version },
+    constants::client_version,
     types::{
         receive::{ self, BoogeymanReceivePayload, ClientParams },
         send::{ self, BoogeymanSendPayload, InitParams, ServerAction, ServerParams },
@@ -37,7 +37,7 @@ pub struct BotHandler {
 impl BotHandler {
     pub async fn new(logger_config: LoggerConfig) -> Result<Self> {
         let tor_handler = TorHandler::new(logger_config).await?;
-        let bot_state = generate_bot_state(client_tag()).await;
+        let bot_state = generate_bot_state().await;
         Ok(BotHandler {
             tor_handler,
             bot_state: Arc::new(RwLock::new(bot_state)),

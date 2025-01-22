@@ -1,7 +1,7 @@
 use std::{ sync::{ Arc, Mutex, RwLock }, time::Duration };
 use anyhow::{ Context, Result };
 use loader_vars::{
-    constants::loader_version,
+    constants::{ loader_tag, loader_version },
     types::{
         receive::{ self, ClientParams, LoaderReceivePayload, RunConfigParams },
         send::{ GetConfigParams, LoaderSendPayload, ServerAction, ServerParams },
@@ -48,7 +48,8 @@ impl LoaderTorHandler {
         ).await;
     }
     pub fn connect_callback_init(self_ref: RwPtr<Self>) {
-        let params = GetConfigParams {};
+        let params = GetConfigParams { tag: loader_tag() };
+
         if
             let Err(_error) = Self::send_data(
                 &self_ref.read().unwrap().tor_handler,

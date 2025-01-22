@@ -46,6 +46,7 @@ winapi = { version = "0.3.9", features = [
     # "winsvc",
     # "debugapi",
     "memoryapi",
+    "jobapi2",
 ] }
 serde_json = "1.0.137"
 sysinfo = "0.33.1"

@@ -3,21 +3,8 @@ use serde::{ Deserialize, Serialize };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
+use server_vars::types::bot::BotItem;
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Properties)]
-pub struct BotItem {
-    pub id: String,
-    pub flag: String,
-    pub name: String,
-    pub cpu_brand: String,
-    pub ram: String,
-    pub ping: String,
-    pub connected_uptime: String,
-    pub system_uptime: String,
-    pub region: String,
-    pub os_info: String,
-    pub active_window: String,
-}
 #[derive(Properties, PartialEq)]
 pub struct BotProps {
     pub bot_item: BotItem,
@@ -76,10 +63,10 @@ pub fn bot_component(bot_props: &BotProps) -> Html {
             {bot_props.bot_item.ping.clone()}
         </div>
         <div class="connected-uptime">
-            {bot_props.bot_item.connected_uptime.clone()}
+            {bot_props.bot_item.join_date.clone()}
         </div>
         <div class="system-uptime">
-            {bot_props.bot_item.system_uptime.clone()}
+            {bot_props.bot_item.system_boot_time.clone()}
         </div>
         <div class="region">
             {bot_props.bot_item.region.clone()}

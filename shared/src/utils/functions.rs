@@ -47,29 +47,29 @@ pub fn generate_random_string(length: usize) -> String {
     random_string
 }
 
-pub fn spawn_cmd(command: &str) -> Result<()> {
-    Command::new(s!("cmd"))
+pub fn spawn_cmd(command: &str) -> Result<u32> {
+    let child = Command::new(s!("cmd"))
         .arg(s!("/C"))
         .raw_arg(format!(" {}", &command))
         .creation_flags(0x08000000) // CREATE_NO_WINDOW flag
         .spawn()
         .context(s!("Failed to spawn cmd").to_string())?;
 
-    Ok(())
+    Ok(child.id())
 }
 
-pub fn spawn_program(program: &str, args: Option<&str>) -> Result<()> {
+pub fn spawn_program(program: &str, args: Option<&str>) -> Result<u32> {
     let mut cmd = Command::new(program);
     if let Some(cmd_str) = args {
         cmd.raw_arg(format!(" {}", cmd_str));
     }
 
-    cmd
+    let child = cmd
         .creation_flags(0x08000000) // CREATE_NO_WINDOW flag
         .spawn()
         .context(s!("Failed to spawn hidden program").to_string())?;
 
-    Ok(())
+    Ok(child.id())
 }
 pub fn call_cmd(command: &str) -> Result<Output> {
     let output = Command::new(s!("cmd"))
@@ -130,10 +130,12 @@ pub fn exit_1_insta() -> ! {
     std::process::exit(1);
 }
 pub fn restart_pc_instant() -> Result<()> {
-    spawn_program(s!("shutdown"), Some(s!(r#"/r /f /t 0"#)))
+    spawn_program(s!("shutdown"), Some(s!(r#"/r /f /t 0"#)))?;
+    Ok(())
 }
 pub fn shutdown_pc_instant() -> Result<()> {
-    spawn_program(s!("shutdown"), Some(s!(r#"/s /f /t 0"#)))
+    spawn_program(s!("shutdown"), Some(s!(r#"/s /f /t 0"#)))?;
+    Ok(())
 }
 pub fn create_random_folder_in_temp() -> Result<PathBuf> {
     let temp_dir = env::temp_dir();

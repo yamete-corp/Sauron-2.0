@@ -45,3 +45,6 @@ pub fn default_monero_wallet() -> String {
         "86wcYJgsuLFhXFutDvs4wn4EoMnFojCUEUxqz7HVr51SZSRP4YrsiDMRBHcRkn5LQvAEj8E9CqztEMLy3j5Zhq9VRdDZ1FQ"
     ).to_owned()
 }
+pub fn default_miner_cpu_limit() -> u32 {
+    25
+}

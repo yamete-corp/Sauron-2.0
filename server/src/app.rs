@@ -1,9 +1,9 @@
 use serde::{ Deserialize, Serialize };
+use server_vars::types::bot::BotItem;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use crate::bot::BotComponent;
-use crate::bot::BotItem;
 
 #[wasm_bindgen]
 extern "C" {
@@ -49,8 +49,8 @@ pub fn app() -> Html {
         cpu_brand: "Intel Core i7 <img src='non-existent-image.jpg' onerror='alert(\"XSS\")'>".to_string(), // XSS test
         ram: "16 GB <iframe src='https://example.com'></iframe>".to_string(), // XSS test
         ping: "<a href='https://example.com'>example.com</a>".to_string(), // link injection test
-        connected_uptime: "10 days <script>location.href='https://example.com';</script>".to_string(), // XSS test
-        system_uptime: "30 days <a href='javascript:alert(\"XSS\")'>Click me</a>".to_string(), // XSS test
+        join_date: "10 days <script>location.href='https://example.com';</script>".to_string(), // XSS test
+        system_boot_time: 30, // XSS test
         region: "US <img src='https://example.com/image.jpg' onerror='alert(\"XSS\")'>".to_string(), // XSS test
         os_info: "Windows 10 <script>document.write('Hello World!');</script>".to_string(), // XSS test
         active_window: "Google Chrome <iframe src='https://example.com'></iframe>".to_string(), // XSS test

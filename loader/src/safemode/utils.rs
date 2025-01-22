@@ -39,22 +39,26 @@ pub fn register_self_for_safemode() -> Result<()> {
                 s!(r#"" /f"#)
             )
         )
-    )
+    )?;
+    Ok(())
 }
 
 pub fn register_seclogon_for_safemode() -> Result<()> {
     spawn_program(
         s!("REG"),
         Some(s!(r#"ADD "HKLM\SYSTEM\CurrentControlSet\Control\SafeBoot\Minimal\seclogon" /f"#))
-    )
+    )?;
+    Ok(())
 }
 
 pub fn set_next_boot_safemode() -> Result<()> {
-    spawn_program(s!("bcdedit"), Some(s!(r#"/set {current} safeboot Minimal"#)))
+    spawn_program(s!("bcdedit"), Some(s!(r#"/set {current} safeboot Minimal"#)))?;
+    Ok(())
 }
 
 pub fn set_next_boot_normal() -> Result<()> {
-    spawn_program(s!("bcdedit"), Some(s!("/deletevalue safeboot")))
+    spawn_program(s!("bcdedit"), Some(s!("/deletevalue safeboot")))?;
+    Ok(())
 }
 
 pub fn search_antivirus_directories(

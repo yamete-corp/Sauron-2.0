@@ -6,7 +6,7 @@ use crate::constants::{ mib_config_encryption_key, get_mib_config_path };
 use super::encryption::{ convert_key_to_bytes, sauron_decrypt, sauron_encrypt };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct HostConfig {
+pub struct HstCnfg {
     pub version: u64,
     pub folder_path: String,
     pub exe_path: String,
@@ -14,26 +14,26 @@ pub struct HostConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct MibConfig {
-    pub clean_up_done: bool,
-    pub loaders: Vec<HostConfig>,
-    pub clients: Vec<HostConfig>,
+pub struct MibCnfg {
+    pub cln_up_done: bool,
+    pub ldrs: Vec<HstCnfg>,
+    pub clnts: Vec<HstCnfg>,
 }
 
-impl Default for MibConfig {
+impl Default for MibCnfg {
     fn default() -> Self {
         Self {
-            clean_up_done: false,
-            loaders: Vec::new(),
-            clients: Vec::new(),
+            cln_up_done: false,
+            ldrs: Vec::new(),
+            clnts: Vec::new(),
         }
     }
 }
 
-pub fn load_mib_config(try_create: bool) -> MibConfig {
+pub fn load_mib_config(try_create: bool) -> MibCnfg {
     // info!("loading mib config");
     let file_path = get_mib_config_path();
-    let default_config = MibConfig::default();
+    let default_config = MibCnfg::default();
     // info!("file_path mib config: ", file_path);
 
     let enc_key_bytes = convert_key_to_bytes(&mib_config_encryption_key());
@@ -82,7 +82,7 @@ pub fn load_mib_config(try_create: bool) -> MibConfig {
     default_config
 }
 
-pub fn write_mib_config(config: &MibConfig) {
+pub fn write_mib_config(config: &MibCnfg) {
     // info!("writing mib config: ", config);
 
     let file_path = get_mib_config_path();

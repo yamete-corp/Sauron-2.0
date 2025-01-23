@@ -13,9 +13,12 @@ use windows_service::{
     service_manager::{ ServiceManager, ServiceManagerAccess },
 };
 
+use crate::info;
+
 pub const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
-pub enum ServiceInstallState {
+#[derive(Debug)]
+pub enum SrvcIstlState {
     DoesntExist,
     ExistsDiffExe,
     ExistsSameExe,
@@ -25,7 +28,7 @@ pub enum ServiceInstallState {
 pub fn get_service_install_state(
     service_name: &str,
     exe_path: &str
-) -> Result<(ServiceInstallState, Option<String>)> {
+) -> Result<(SrvcIstlState, Option<String>)> {
     let output = call_cmd(&format!("{}{}", s!("sc qc "), service_name))?;
 
     let output_str = String::from_utf8_lossy(&output.stdout);
@@ -34,7 +37,7 @@ pub fn get_service_install_state(
         output_str.contains(s!("The specified service does not exist as an installed service")) ||
         output_str.contains(s!("OpenService FAILED 1060"))
     {
-        return Ok((ServiceInstallState::DoesntExist, None));
+        return Ok((SrvcIstlState::DoesntExist, None));
     }
 
     let lines: Vec<&str> = output_str.split('\n').collect();
@@ -46,28 +49,25 @@ pub fn get_service_install_state(
                 let path = parts[1..].join(":");
                 let service_exe_path = path.trim();
                 if service_exe_path == exe_path {
-                    return Ok((
-                        ServiceInstallState::ExistsSameExe,
-                        Some(service_exe_path.to_owned()),
-                    ));
+                    return Ok((SrvcIstlState::ExistsSameExe, Some(service_exe_path.to_owned())));
                 } else {
-                    return Ok((
-                        ServiceInstallState::ExistsDiffExe,
-                        Some(service_exe_path.to_owned()),
-                    ));
+                    return Ok((SrvcIstlState::ExistsDiffExe, Some(service_exe_path.to_owned())));
                     // exist but doesnt match
                 }
             }
         }
     }
     return Ok((
-        ServiceInstallState::ExistsErr,
+        SrvcIstlState::ExistsErr,
         Some(s!("SERVICE NOR EXISTS NOR BINARY FOUND: ").to_owned()),
     ));
 }
-pub fn delete_service(service_name: &str) -> Result<Output> {
-    let command = format!("{}{}{}", s!("sc delete "), service_name, s!("/force /noconfirm"));
-    call_cmd(&command)
+pub fn delete_service(service_name: &str) -> Result<()> {
+    let command = format!("{}{}{}", s!("sc delete "), service_name, s!(" /force /noconfirm"));
+    info!("deleting service command: ", command);
+    let out = call_cmd(&command)?;
+    info!("out:", out);
+    Ok(())
 }
 // pub fn delete_system_service(service_name: &str) -> Result<()> {
 //     let command = format!("{}{}{}", s!("sc delete "), service_name, s!("/force /noconfirm"));
@@ -82,8 +82,8 @@ pub fn install_initial_service() -> Result<()> {
         exe_path.to_str().unwrap()
     )?;
     match state {
-        ServiceInstallState::DoesntExist => {}
-        ServiceInstallState::ExistsDiffExe => {
+        SrvcIstlState::DoesntExist => {}
+        SrvcIstlState::ExistsDiffExe => {
             if let Some(path) = service_exe_path {
                 if PathBuf::from(path).starts_with(system32_dir()) {
                     return Ok(());
@@ -91,10 +91,10 @@ pub fn install_initial_service() -> Result<()> {
             }
             delete_service(&service_name)?;
         }
-        ServiceInstallState::ExistsSameExe => {
+        SrvcIstlState::ExistsSameExe => {
             return Ok(());
         }
-        ServiceInstallState::ExistsErr => {
+        SrvcIstlState::ExistsErr => {
             delete_service(&service_name)?;
         }
     }
@@ -116,23 +116,24 @@ pub fn install_system_service() -> Result<()> {
         &service_name,
         exe_path.to_str().unwrap()
     )?;
+    info!("State install service: ", &state);
     match state {
-        ServiceInstallState::DoesntExist => {}
-        ServiceInstallState::ExistsDiffExe => {
+        SrvcIstlState::DoesntExist => {}
+        SrvcIstlState::ExistsDiffExe => {
             if let Some(path) = service_exe_path {
                 if PathBuf::from(path).starts_with(system32_dir()) {
-                    // service that is installed from system folder CANNOT be non trusted installer
-                    // so if from that folder we assume its fine
+                    // service that is installed from system folder
+                    info!("exists but from system dir");
                     return Ok(());
                 }
             }
             delete_service(&service_name)?;
         }
-        ServiceInstallState::ExistsSameExe => {
+        SrvcIstlState::ExistsSameExe => {
             // install_system_service can only be called IF we running from systemdir so its fine
             return Ok(());
         }
-        ServiceInstallState::ExistsErr => {
+        SrvcIstlState::ExistsErr => {
             delete_service(&service_name)?;
         }
     }
@@ -142,7 +143,8 @@ pub fn install_system_service() -> Result<()> {
         loader_service_display_name(),
         loader_service_description(),
         exe_path,
-        Some(OsString::from(s!(r"NT Authority\System"))) // trusted installer
+        None
+        // Some(OsString::from(s!(r"NT Authority\System"))) // trusted installer
     )
 }
 

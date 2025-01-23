@@ -2,10 +2,10 @@
 
 // use crate::{ err, info };
 // use obfstr::obfstr as s;
-use winapi::um::processthreadsapi::GetCurrentProcess;
+// use winapi::um::processthreadsapi::GetCurrentProcess;
 // use std::env;
 // use std::path::PathBuf;
-use winapi::um::debugapi::{ CheckRemoteDebuggerPresent, IsDebuggerPresent };
+// use winapi::um::debugapi::{ CheckRemoteDebuggerPresent, IsDebuggerPresent };
 use obfstr::obfstr as s;
 use crate::constants::get_fingerprint_dir;
 use super::functions::get_current_exe_dir;
@@ -30,21 +30,21 @@ pub fn is_clean() -> bool {
     //     err!("VM Detection isnt empty: ", detection);
     //     return false;
     // }
-    unsafe {
-        if IsDebuggerPresent() != 0 {
-            // err!("Debugger is present.");
-            return false;
-        }
+    // unsafe {
+    //     if IsDebuggerPresent() != 0 {
+    //         // err!("Debugger is present.");
+    //         return false;
+    //     }
 
-        let mut is_debugger_present = 0;
+    //     let mut is_debugger_present = 0;
 
-        CheckRemoteDebuggerPresent(GetCurrentProcess(), &mut is_debugger_present);
+    //     CheckRemoteDebuggerPresent(GetCurrentProcess(), &mut is_debugger_present);
 
-        if is_debugger_present != 0 {
-            // err!("Remote Debugger is present.");
-            return false;
-        }
-    }
+    //     if is_debugger_present != 0 {
+    //         // err!("Remote Debugger is present.");
+    //         return false;
+    //     }
+    // }
 
     true
 }

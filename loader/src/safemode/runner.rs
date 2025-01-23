@@ -170,7 +170,7 @@ pub fn clean_up() -> Result<()> {
     }
 
     let mut mib_xml_config = load_mib_config(true);
-    mib_xml_config.clean_up_done = true;
+    mib_xml_config.cln_up_done = true;
     write_mib_config(&mib_xml_config);
 
     let elapsed_time = start_time.elapsed();

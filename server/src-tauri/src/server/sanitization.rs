@@ -4,7 +4,7 @@ use client_vars::types::send::InitParams;
 use client_vars::types::structs::DynamicInfo;
 use client_vars::types::structs::HardwareInfo;
 use client_vars::types::structs::OSInfo;
-use loader_vars::types::send::GetConfigParams;
+use loader_vars::types::send::GtCnfgPrms;
 
 const MAX_VERSION: u64 = 2;
 const MAX_TAG_LEN: usize = 16;
@@ -80,7 +80,7 @@ fn verify_os_info(os_info: &OSInfo) -> Result<()> {
 
     Ok(())
 }
-pub fn verify_loader_get_config(data: &GetConfigParams) -> Result<()> {
+pub fn verify_loader_get_config(data: &GtCnfgPrms) -> Result<()> {
     if data.tag.len() > MAX_TAG_LEN {
         return Err(anyhow!("Tag length exceeds maximum allowed length"));
     }

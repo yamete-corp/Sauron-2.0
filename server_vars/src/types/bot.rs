@@ -1,5 +1,6 @@
 use serde::{ Deserialize, Serialize };
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct BotItem {
     pub id: String,
     pub flag: String,

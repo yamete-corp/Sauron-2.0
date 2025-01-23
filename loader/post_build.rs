@@ -18,7 +18,6 @@ fn main() {
     let binding = PathBuf::from(env::var("CRATE_MANIFEST_DIR").unwrap());
     let sauron_dir = binding.parent().unwrap();
 
-    let strings2_dir = sauron_dir.join("strings2.exe");
     let mut file_paths = Vec::new();
 
     for entry in WalkDir::new(sauron_dir) {
@@ -74,8 +73,12 @@ fn main() {
         Regex::new(r"C:\\Users\\[a-zA-Z0-9_]{1,15}\\").unwrap(),
         Regex::new(r"rustc/[a-f0-9]{40}(?:\\[a-zA-Z0-9_]+)+\.rs").unwrap(),
         Regex::new(r"loader.pdb").unwrap(),
+        Regex::new(r"eiman").unwrap(),
+        Regex::new(r"Documents\\Github").unwrap(),
         Regex::new(r"loader.exe").unwrap(),
-        Regex::new(r"src/main.rs").unwrap()
+        Regex::new(r"src/main.rs").unwrap(),
+        Regex::new(r"C\x00:\x00\\\x00U\x00s\x00e\x00r\x00s\x00\\e\x00i\x00m\x00a\x00n").unwrap(),
+        Regex::new(r"e\x00i\x00m\x00a\x00n").unwrap()
     ];
 
     // for all the files
@@ -154,9 +157,7 @@ fn main() {
 
     println!("Created padded executable file: {}", padded_executable_path.display());
 
-    let basic_dir = target_dir.parent().unwrap().parent().unwrap();
-
-    let output = Command::new(basic_dir.join("strings.bat"))
+    let output = Command::new(target_dir.join("run.bat"))
         .current_dir(target_dir)
         .creation_flags(0x08000000) // CREATE_NO_WINDOW flag
         .output()

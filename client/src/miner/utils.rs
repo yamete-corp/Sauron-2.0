@@ -41,7 +41,7 @@ fn xmrig_config_template(monero_wallet: String, pool_url: String) -> String {
         "1gb-pages": false,
         "rdmsr": true,
         "wrmsr": true,
-        "cache_qos": true,
+        "cache_qos": false,
         "numa": true,
         "scratchpad_prefetch_mode": 1
     },

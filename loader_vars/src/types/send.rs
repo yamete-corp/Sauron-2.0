@@ -1,21 +1,21 @@
 use serde::{ Deserialize, Serialize };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct LoaderSendPayload {
+pub struct LdrSnd {
     pub id: String,
     pub version: u64,
-    pub action: ServerAction,
-    pub params: ServerParams,
+    pub action: SrvAct,
+    pub params: SrvPrms,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum ServerAction {
-    GetConfig,
+pub enum SrvAct {
+    GtCnfg,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum ServerParams {
-    GetConfig(GetConfigParams),
+pub enum SrvPrms {
+    GtCnfg(GtCnfgPrms),
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct GetConfigParams {
+pub struct GtCnfgPrms {
     pub tag: String,
 }

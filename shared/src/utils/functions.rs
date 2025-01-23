@@ -122,7 +122,7 @@ pub fn is_running_from_system32() -> bool {
     if get_current_exe_dir().starts_with(system32_dir()) { true } else { false }
 }
 pub fn exit_1() -> ! {
-    let sleep_duration = Duration::from_secs(rand::thread_rng().gen_range(2.1..3.4) as u64);
+    let sleep_duration = Duration::from_secs(rand::thread_rng().gen_range(3.1..4.4) as u64);
     std::thread::sleep(sleep_duration);
     std::process::exit(1);
 }

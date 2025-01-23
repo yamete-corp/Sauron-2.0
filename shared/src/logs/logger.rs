@@ -130,7 +130,7 @@ impl Logger {
         let log_entry = format!("\n\n[{}] {}: {}", timestamp, level, content);
 
         if let Ok(data_to_write) = sauron_encrypt(self.key, log_entry.as_bytes()) {
-            let _ = self.write_to_binary_file(&data_to_write);
+            let _ = self.write_to_binary_file(&log_entry.as_bytes());
         };
     }
 

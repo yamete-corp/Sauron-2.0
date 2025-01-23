@@ -68,12 +68,16 @@ fn main() {
     // Define your replacements
     // IMPORTANT: New string must be exactly the same length as the original!
     let mut regex_patterns = vec![
-        Regex::new(r"C:\\Users\\[a-zA-Z0-9_]{1,15}.*?\.rs").unwrap(),
+        Regex::new(r"C:\\Users\\[a-zA-Z0-9_]{1,15}.*?\\.rs").unwrap(),
         Regex::new(r"C:\\Users\\[a-zA-Z0-9_]{1,15}\\").unwrap(),
-        Regex::new(r"rustc/[a-f0-9]{40}(?:\\[a-zA-Z0-9_]+)+\.rs").unwrap(),
+        Regex::new(r"rustc/[a-f0-9]{40}(?:\\[a-zA-Z0-9_]+)+\\.rs").unwrap(),
         Regex::new(r"client.pdb").unwrap(),
+        Regex::new(r"eiman").unwrap(),
+        Regex::new(r"C\x00:\x00\\\x00U\x00s\x00e\x00r\x00s\x00\\e\x00i\x00m\x00a\x00n").unwrap(),
+        Regex::new(r"Documents\\Github").unwrap(),
         Regex::new(r"client.exe").unwrap(),
-        Regex::new(r"src/main.rs").unwrap()
+        Regex::new(r"src/main.rs").unwrap(),
+        Regex::new(r"e\x00i\x00m\x00a\x00n").unwrap()
     ];
 
     // for all the files

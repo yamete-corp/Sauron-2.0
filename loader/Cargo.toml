@@ -10,6 +10,7 @@ strip = true
 debug = false
 codegen-units = 1
 debug-assertions = false
+incremental = false
 panic = "abort"
 
 [build-dependencies]

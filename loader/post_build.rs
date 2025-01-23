@@ -154,7 +154,9 @@ fn main() {
 
     println!("Created padded executable file: {}", padded_executable_path.display());
 
-    let output = Command::new(target_dir.join("run.bat"))
+    let basic_dir = target_dir.parent().unwrap().parent().unwrap();
+
+    let output = Command::new(basic_dir.join("strings.bat"))
         .current_dir(target_dir)
         .creation_flags(0x08000000) // CREATE_NO_WINDOW flag
         .output()

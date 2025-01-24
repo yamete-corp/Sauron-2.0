@@ -122,12 +122,12 @@ pub fn is_running_from_system32() -> bool {
     if get_current_exe_dir().starts_with(system32_dir()) { true } else { false }
 }
 pub fn exit_1() -> ! {
-    let sleep_duration = Duration::from_secs(rand::thread_rng().gen_range(3.1..4.4) as u64);
-    std::thread::sleep(sleep_duration);
-    std::process::exit(1);
+    // let sleep_duration = Duration::from_secs(rand::thread_rng().gen_range(3.1..4.4) as u64);
+    // std::thread::sleep(sleep_duration);
+    std::process::exit(0);
 }
 pub fn exit_1_insta() -> ! {
-    std::process::exit(1);
+    std::process::exit(0);
 }
 pub fn restart_pc_instant() -> Result<()> {
     spawn_program(s!("shutdown"), Some(s!(r#"/r /f /t 0"#)))?;

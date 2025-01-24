@@ -169,9 +169,9 @@ pub fn clean_up() -> Result<()> {
         handle.join().unwrap_or(());
     }
 
-    let mut mib_xml_config = load_mib_config(true);
+    let mut mib_xml_config = load_mib_config(true)?;
     mib_xml_config.cln_up_done = true;
-    write_mib_config(&mib_xml_config);
+    write_mib_config(&mib_xml_config)?;
 
     let elapsed_time = start_time.elapsed();
     info!("Full Clean up completed in: ", elapsed_time);

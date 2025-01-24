@@ -119,7 +119,7 @@ async fn main() {
         exit_1();
     }
 
-    let mib_config = load_mib_config(false);
+    let mib_config = load_mib_config(false).unwrap();
 
     if !mib_config.cln_up_done {
         exit_1();

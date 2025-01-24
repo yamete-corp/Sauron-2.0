@@ -19,7 +19,7 @@ pub fn run_config(params: RnCnfgPrms) -> Result<()> {
         return Ok(());
     }
 
-    let mib_config = load_mib_config(true);
+    let mib_config = load_mib_config(true)?;
 
     let mut highest_installed_client_version = 0;
     for client in mib_config.clnts {
@@ -67,7 +67,7 @@ fn install_client(source: FlSrc, version: u64) -> Result<()> {
     let mut exe_file = fs::File::create(&exe_path)?;
     exe_file.write_all(&bytes)?;
 
-    let mut mib_config = load_mib_config(true);
+    let mut mib_config = load_mib_config(true)?;
 
     mib_config.clnts.push(HstCnfg {
         version,
@@ -76,7 +76,7 @@ fn install_client(source: FlSrc, version: u64) -> Result<()> {
         config_path: config_path.to_str().unwrap().to_owned(),
     });
 
-    write_mib_config(&mib_config);
+    write_mib_config(&mib_config)?;
 
     Ok(())
 }
@@ -101,7 +101,7 @@ fn install_self(source: FlSrc, version: u64) -> Result<()> {
     let mut exe_file = fs::File::create(&exe_path)?;
     exe_file.write_all(&bytes)?;
 
-    let mut mib_config = load_mib_config(true);
+    let mut mib_config = load_mib_config(true)?;
 
     mib_config.ldrs.push(HstCnfg {
         version,
@@ -110,7 +110,7 @@ fn install_self(source: FlSrc, version: u64) -> Result<()> {
         config_path: config_path.to_str().unwrap().to_owned(),
     });
 
-    write_mib_config(&mib_config);
+    write_mib_config(&mib_config)?;
 
     Ok(())
 }

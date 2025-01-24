@@ -15,7 +15,7 @@ pub fn communication_encryption_key() -> String {
 pub fn logs_encryption_key() -> String {
     s!("logs_enc87_key_d3p4F3a515nmG_8xE").to_owned()
 }
-pub fn mib_config_encryption_key() -> String {
+pub fn configs_encryption_key() -> String {
     s!("35G8Rf4M6s4d132amjydsIB4141dXML0").to_owned()
 }
 pub fn client_exe_name() -> String {

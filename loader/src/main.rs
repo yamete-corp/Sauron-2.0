@@ -11,12 +11,7 @@ use shared::{
     utils::{
         anti_tampering::is_clean,
         config::load_mib_config,
-        functions::{
-            exit_1,
-            get_current_exe,
-            is_running_from_system32,
-            try_spawn_program_as_system,
-        },
+        functions::{ exit_1, is_running_from_system32 },
     },
 };
 use windows_service_detector::is_running_as_windows_service;
@@ -135,7 +130,7 @@ fn main() {
     }
     info!("Init");
 
-    let mib_config = load_mib_config(false);
+    let mib_config = load_mib_config(false).unwrap();
 
     let is_service = is_running_as_windows_service().unwrap_or_else(|error| {
         err!("is_running_as_windows_service Error, assuming true:", error);
@@ -188,8 +183,8 @@ fn main() {
                 err!("install_initial_service Error: ", error);
             }
         }
+        exit_1();
     }
-    exit_1();
 }
 
 // hide folders?

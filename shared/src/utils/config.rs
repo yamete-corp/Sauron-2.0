@@ -1,9 +1,13 @@
 //! clean up
-
+use obfstr::obfstr as s;
 use std::fs;
 use serde::{ Deserialize, Serialize };
-use crate::constants::{ mib_config_encryption_key, get_mib_config_path };
-use super::encryption::{ convert_key_to_bytes, sauron_decrypt, sauron_encrypt };
+use crate::constants::{ configs_encryption_key, get_mib_config_path };
+use super::{
+    encryption::{ convert_key_to_bytes, sauron_decrypt, sauron_encrypt },
+    functions::get_current_exe_dir,
+};
+use anyhow::Result;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HstCnfg {
@@ -30,66 +34,74 @@ impl Default for MibCnfg {
     }
 }
 
-pub fn load_mib_config(try_create: bool) -> MibCnfg {
+pub fn load_mib_config(try_create: bool) -> Result<MibCnfg> {
     // info!("loading mib config");
     let file_path = get_mib_config_path();
     let default_config = MibCnfg::default();
     // info!("file_path mib config: ", file_path);
-
-    let enc_key_bytes = convert_key_to_bytes(&mib_config_encryption_key());
-    if !file_path.exists() {
-        if try_create {
-            if
-                let Ok(encrypted_data) = sauron_encrypt(
-                    enc_key_bytes,
-                    &serde_json::to_vec(&default_config).unwrap()
-                )
-            {
-                match fs::write(file_path, encrypted_data) {
-                    Ok(()) => {} //info!("wrote default mib config: ", default_config),
-                    Err(_error) => {} //err!("failed to write mib config: ", error),
-                }
-            }
-        }
-
-        return default_config;
-    }
-
+    let enc_key_bytes = convert_key_to_bytes(&configs_encryption_key());
     if let Ok(encrypted_data) = fs::read(file_path.clone()) {
         if let Ok(decrypted_data) = sauron_decrypt(enc_key_bytes, &encrypted_data) {
-            match serde_json::from_slice(&decrypted_data) {
-                Ok(config) => {
-                    // info!("loaded mib config: ", config);
-                    return config;
-                }
-                Err(_error) => {
-                    // err!("Error parsing mib.xml overriding with default: ", error);
-                    if
-                        let Ok(encrypted_data) = sauron_encrypt(
-                            enc_key_bytes,
-                            &serde_json::to_vec(&default_config).unwrap()
-                        )
-                    {
-                        match fs::write(file_path, encrypted_data) {
-                            Ok(()) => {} //info!("wrote default mib config: ", default_config),
-                            Err(_error) => {} //err!("failed to write mib config: ", error),
-                        }
-                    }
-                }
+            if let Ok(cnfg) = serde_json::from_slice(&decrypted_data) {
+                return Ok(cnfg);
             }
         }
     }
-    default_config
+    if try_create {
+        let encrypted_data = sauron_encrypt(enc_key_bytes, &serde_json::to_vec(&default_config)?)?;
+
+        fs::write(file_path, encrypted_data)?;
+    }
+
+    Ok(default_config)
+}
+pub fn write_mib_config(config: &MibCnfg) -> Result<()> {
+    // info!("writing mib config: ", config);
+    let file_path = get_mib_config_path();
+    let enc_key_bytes = convert_key_to_bytes(&configs_encryption_key());
+    let encrypted_data = sauron_encrypt(enc_key_bytes, &serde_json::to_vec(config)?)?;
+    fs::write(file_path, encrypted_data)?;
+    Ok(())
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum LdrStage {
+    NoneReged,
+    SclReged,
+    SlfReged,
+    SfbReged,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CacheCnfgLdr {
+    pub stage: LdrStage,
+}
+impl Default for CacheCnfgLdr {
+    fn default() -> Self {
+        CacheCnfgLdr { stage: LdrStage::NoneReged }
+    }
+}
+pub fn loader_cache_config() -> Result<CacheCnfgLdr> {
+    let file_path = get_current_exe_dir().join(s!("cache.cfg"));
+    let default_cache = CacheCnfgLdr::default();
+    let enc_key_bytes = convert_key_to_bytes(&configs_encryption_key());
+    if let Ok(encrypted_data) = fs::read(file_path.clone()) {
+        if let Ok(decrypted_data) = sauron_decrypt(enc_key_bytes, &encrypted_data) {
+            if let Ok(cnfg) = serde_json::from_slice(&decrypted_data) {
+                return Ok(cnfg);
+            }
+        }
+    }
+
+    let encrypted_data = sauron_encrypt(enc_key_bytes, &serde_json::to_vec(&default_cache)?)?;
+
+    fs::write(file_path, encrypted_data)?;
+
+    Ok(default_cache)
 }
 
-pub fn write_mib_config(config: &MibCnfg) {
-    // info!("writing mib config: ", config);
-
-    let file_path = get_mib_config_path();
-    let enc_key_bytes = convert_key_to_bytes(&mib_config_encryption_key());
-    let encrypted_data = sauron_encrypt(
-        enc_key_bytes,
-        &serde_json::to_vec(config).unwrap()
-    ).unwrap();
-    fs::write(file_path, encrypted_data).unwrap();
+pub fn write_loader_cache_config(config: &CacheCnfgLdr) -> Result<()> {
+    let file_path = get_current_exe_dir().join(s!("cache.cfg"));
+    let enc_key_bytes = convert_key_to_bytes(&configs_encryption_key());
+    let encrypted_data = sauron_encrypt(enc_key_bytes, &serde_json::to_vec(config)?)?;
+    fs::write(file_path, encrypted_data)?;
+    Ok(())
 }

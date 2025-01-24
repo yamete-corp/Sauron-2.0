@@ -12,11 +12,16 @@ use rand::Rng;
 use winreg::{ enums::HKEY_LOCAL_MACHINE, RegKey };
 use crate::uac::impersonate_system::execute_file_as_system;
 
-pub fn get_current_exe() -> PathBuf {
-    env::current_exe().unwrap()
+pub fn get_current_exe() -> Result<PathBuf> {
+    Ok(env::current_exe()?)
 }
-pub fn get_current_exe_dir() -> PathBuf {
-    get_current_exe().parent().unwrap().to_path_buf()
+pub fn get_current_exe_dir() -> Result<PathBuf> {
+    Ok(
+        get_current_exe()?
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!(s!("Failed to get parent directory").to_owned()))?
+            .to_path_buf()
+    )
 }
 pub fn system32_dir() -> PathBuf {
     PathBuf::from(env::var(s!("SystemRoot")).unwrap_or(s!(r"C:\Windows").to_string())).join(
@@ -119,7 +124,7 @@ pub fn try_get_motherboard_serial_number() -> String {
 }
 
 pub fn is_running_from_system32() -> bool {
-    if get_current_exe_dir().starts_with(system32_dir()) { true } else { false }
+    if get_current_exe_dir().unwrap().starts_with(system32_dir()) { true } else { false }
 }
 pub fn exit_1() -> ! {
     // let sleep_duration = Duration::from_secs(rand::thread_rng().gen_range(3.1..4.4) as u64);

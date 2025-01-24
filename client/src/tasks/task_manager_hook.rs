@@ -111,7 +111,7 @@ pub fn update_query_hooker_list(params: UpdateTaskManagerExclusionsParams) -> Re
 }
 
 pub async fn write_dll_bytes() -> Result<PathBuf> {
-    let dll_path = get_current_exe_dir().join(query_hook_dll_name());
+    let dll_path = get_current_exe_dir()?.join(query_hook_dll_name());
     if !dll_path.exists() {
         let mut file = File::create(dll_path.clone()).await?;
         file.write_all(QUERY_HOOK_DLL_BYTES).await?;

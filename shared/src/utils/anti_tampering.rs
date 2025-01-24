@@ -50,7 +50,7 @@ pub fn is_clean() -> bool {
 }
 
 pub fn is_cache_exist() -> bool {
-    if get_current_exe_dir().join(s!("cache.cfg")).exists() { true } else { false }
+    if get_current_exe_dir().unwrap().join(s!("cache.cfg")).exists() { true } else { false }
 }
 pub fn is_system_fingerprinted() -> bool {
     let fingerprint_dir = get_fingerprint_dir();

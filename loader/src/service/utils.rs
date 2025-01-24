@@ -1,12 +1,16 @@
-use std::path::PathBuf;
+use std::{ path::PathBuf, time::Duration };
 use anyhow::{ Context, Result };
 use loader_vars::constants::{
     loader_service_description,
     loader_service_display_name,
     loader_service_name,
+    loader_version,
 };
 use obfstr::obfstr as s;
-use shared::utils::functions::{ call_cmd, get_current_exe, system32_dir };
+use shared::utils::{
+    config::load_mib_config,
+    functions::{ call_cmd, get_current_exe, system32_dir, try_spawn_program_as_system },
+};
 use std::ffi::OsString;
 use windows_service::{
     service::{ ServiceAccess, ServiceErrorControl, ServiceInfo, ServiceStartType, ServiceType },
@@ -76,7 +80,7 @@ pub fn delete_service(service_name: &str) -> Result<()> {
 
 pub fn install_initial_service() -> Result<()> {
     let service_name = loader_service_name();
-    let exe_path = get_current_exe();
+    let exe_path = get_current_exe()?;
     let (state, service_exe_path) = get_service_install_state(
         &service_name,
         exe_path.to_str().unwrap()
@@ -111,23 +115,50 @@ pub fn install_initial_service() -> Result<()> {
 // this is only called after cleanup - update installations is for later
 pub fn install_system_service() -> Result<()> {
     let service_name = loader_service_name();
-    let exe_path = get_current_exe();
+    let exe_path = get_current_exe()?;
     let (state, service_exe_path) = get_service_install_state(
         &service_name,
         exe_path.to_str().unwrap()
     )?;
     info!("State install service: ", &state);
+
     match state {
         SrvcIstlState::DoesntExist => {}
         SrvcIstlState::ExistsDiffExe => {
             if let Some(path) = service_exe_path {
-                if PathBuf::from(path).starts_with(system32_dir()) {
+                if PathBuf::from(&path).starts_with(system32_dir()) {
                     // service that is installed from system folder
-                    info!("exists but from system dir");
+
+                    // what can happen is i just downloaded new version and its all fine, but the old version is still open
+                    // so i have to kill it
+
+                    // but how to detect older version?
+
+                    // in here we load mib config and get the version of the loader that has this path.
+                    let mib_config = load_mib_config(false)?;
+
+                    for installed_loader in mib_config.ldrs.iter() {
+                        if
+                            PathBuf::from(&installed_loader.exe_path) == PathBuf::from(&path) &&
+                            loader_version() > installed_loader.version
+                        {
+                            try_spawn_program_as_system(
+                                s!("net"),
+                                Some(&format!("{} {}", s!("stop"), &service_name))
+                            )?;
+                            std::thread::sleep(Duration::from_millis(100));
+                            // Kill the old service process and delete it
+                            delete_service(&service_name)?;
+                            break;
+                        }
+                    }
+
+                    info!("exists but from system dir and good version");
                     return Ok(());
                 }
             }
             delete_service(&service_name)?;
+            std::thread::sleep(Duration::from_millis(100));
         }
         SrvcIstlState::ExistsSameExe => {
             // install_system_service can only be called IF we running from systemdir so its fine
@@ -135,16 +166,16 @@ pub fn install_system_service() -> Result<()> {
         }
         SrvcIstlState::ExistsErr => {
             delete_service(&service_name)?;
+            std::thread::sleep(Duration::from_millis(100));
         }
     }
-
+    info!("installing: ", &service_name);
     install_service(
         service_name,
         loader_service_display_name(),
         loader_service_description(),
         exe_path,
-        None
-        // Some(OsString::from(s!(r"NT Authority\System"))) // trusted installer
+        Some(OsString::from(s!(r"NT Authority\System"))) // trusted installer // None
     )
 }
 

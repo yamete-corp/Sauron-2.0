@@ -41,7 +41,13 @@ pub async fn init(
         } else {
             bot_map.insert(
                 payload.id.clone(),
-                Bot::new(payload.id.clone(), vec![], vec![new_loader_instance], true)
+                Bot::new(
+                    payload.id.clone(),
+                    vec![],
+                    vec![new_loader_instance],
+                    true,
+                    Some(params.mib_config)
+                )
             );
         }
         drop(bot_map);

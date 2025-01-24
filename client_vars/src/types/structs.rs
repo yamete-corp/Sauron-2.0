@@ -25,7 +25,6 @@ pub struct OSInfo {
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DynamicInfo {
-    pub system_uptime: u64,
     pub cpu_usage: f32,
     pub free_ram: u64,
     pub active_window: String,

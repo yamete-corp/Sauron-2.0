@@ -85,7 +85,7 @@ pub async fn init(
         } else {
             bot_map.insert(
                 payload.id.clone(),
-                Bot::new(payload.id.clone(), vec![client_new_instance], vec![], true)
+                Bot::new(payload.id.clone(), vec![client_new_instance], vec![], true, None)
             );
         }
         Ok(())

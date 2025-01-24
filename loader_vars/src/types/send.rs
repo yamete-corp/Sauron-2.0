@@ -1,4 +1,5 @@
 use serde::{ Deserialize, Serialize };
+use shared::utils::config::MibCnfg;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LdrSnd {
@@ -18,4 +19,5 @@ pub enum SrvPrms {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GtCnfgPrms {
     pub tag: String,
+    pub mib_config: MibCnfg,
 }

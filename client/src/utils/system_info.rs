@@ -48,7 +48,6 @@ pub fn get_dynamic_info() -> DynamicInfo {
         free_ram: sys.free_memory(),
         cpu_usage: sys.global_cpu_usage(),
         active_window: get_active_window(),
-        system_uptime: System::uptime(),
     }
 }
 

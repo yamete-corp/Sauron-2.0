@@ -20,6 +20,9 @@ pub fn sauron_encrypt(key: [u8; 32], data: &[u8]) -> Result<Vec<u8>> {
     Ok(encrypted_data_with_nonce)
 }
 pub fn sauron_decrypt(key: [u8; 32], data: &[u8]) -> Result<Vec<u8>> {
+    if data.len() <= 12 {
+        return Err(anyhow!(s!("Data is too short to contain a nonce").to_owned()));
+    }
     let nonce = &data[data.len() - 12..];
     let encrypted_data = &data[..data.len() - 12];
     let cipher = ChaCha20Poly1305::new(Key::from_slice(&key));
@@ -40,7 +43,9 @@ pub fn convert_key_to_bytes(key: &str) -> [u8; 32] {
     let mut key_bytes = key.as_bytes().to_vec();
     key_bytes.resize(32, 0);
 
-    let array: [u8; 32] = key_bytes.try_into().unwrap();
+    let mut array = [0u8; 32];
+    array.copy_from_slice(&key_bytes);
+
     array
 }
 pub fn convert_bytes_to_key(key_bytes: [u8; 32]) -> Result<String> {

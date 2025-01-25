@@ -88,6 +88,7 @@ pub async fn init(
                 Bot::new(payload.id.clone(), vec![client_new_instance], vec![], true, None)
             );
         }
+        println!("Bot map: {:#?}", bot_map);
         Ok(())
     } else {
         return Err(anyhow::anyhow!(format!("Invalid params for: {:#?}", payload.action)));

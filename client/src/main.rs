@@ -158,9 +158,9 @@ async fn main() {
         .unwrap()
         .to_owned();
 
-    if let Err(error) = run_miner(&miner_file_path) {
-        err!("run_miner failed: ", error);
-    }
+    // if let Err(error) = run_miner(&miner_file_path) {
+    //     err!("run_miner failed: ", error);
+    // }
 
     let config = LoggerCnfg::Existing(LOGGER.lock().unwrap().clone());
     info!("LoggerCnfg made");

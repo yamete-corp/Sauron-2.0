@@ -160,6 +160,7 @@ impl ServerHandler {
         let data: ServerReceive = serde_json
             ::from_slice(&decrypted_data)
             .context(s!("Failed to parse decrypted_data as ServerReceive").to_string())?;
+        println!("data: {:#?}", data);
 
         match data.server_receive_type {
             SrvRcvTp::Ldr => {

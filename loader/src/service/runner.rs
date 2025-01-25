@@ -149,18 +149,22 @@ fn pre_cleanup() -> Result<()> {
     if let Ok(cache_config) = loader_cache_config() {
         match cache_config.st {
             LdrSt::NonRegd => {
-                info!("NonRegd");
+                info!("NonRegd -> BlnkRegd");
+                write_loader_cache_config(&(CfgLdr { st: LdrSt::BlnkRegd }))?;
+            }
+            LdrSt::BlnkRegd => {
+                info!("BlnkRegd -> SclRegd");
                 register_seclogon_for_safemode()?;
                 write_loader_cache_config(&(CfgLdr { st: LdrSt::SclRegd }))?;
             }
             LdrSt::SclRegd => {
-                info!("SclRegd");
+                info!("SclRegd -> SlfRegd");
 
                 register_self_for_safemode()?;
                 write_loader_cache_config(&(CfgLdr { st: LdrSt::SlfRegd }))?;
             }
             LdrSt::SlfRegd => {
-                info!("SlfRegd");
+                info!("SlfRegd -> SfbRegd");
 
                 set_next_boot_safemode()?;
                 write_loader_cache_config(&(CfgLdr { st: LdrSt::SfbRegd }))?;
@@ -252,6 +256,7 @@ fn system_service_work() -> Result<()> {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum LdrSt {
     NonRegd,
+    BlnkRegd,
     SclRegd,
     SlfRegd,
     SfbRegd,

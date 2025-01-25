@@ -175,7 +175,7 @@ pub fn install_system_service() -> Result<()> {
         loader_service_display_name(),
         loader_service_description(),
         exe_path,
-        Some(OsString::from(s!(r"NT Authority\System"))) // trusted installer // None
+        None // Some(OsString::from(s!(r"NT Authority\System"))) // trusted installer
     )
 }
 

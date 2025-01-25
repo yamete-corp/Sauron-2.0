@@ -321,6 +321,7 @@ impl BotHandler {
         action: ServerAction,
         params: ServerParams
     ) -> Result<()> {
+        info!("SENDING DATA");
         let tor_h = &self_ref.read().await.tor_handler;
         let payload = BoogeymanSendPayload {
             id: tor_h.dv_id.read().await.to_owned(),

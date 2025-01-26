@@ -27,7 +27,7 @@ pub fn convert_bot_to_frontend(bot: &Bot) -> BotItem {
         region: ip_info.region.clone(),
         os_info: bot_state.os_info.os_version.clone().unwrap_or("-".to_owned()),
         active_window: dynamic_info.active_window.clone(),
-        mib_config: bot.mib_config.clone(),
+        // mib_config: bot.mib_config.clone(),
         client_instances: bot.client_instances
             .iter()
             .map(|client_instance| FrontendClientInstance {

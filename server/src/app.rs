@@ -25,35 +25,35 @@ struct FetchBotsArgs {
 
 #[function_component(App)]
 pub fn app() -> Html {
-    let loaded_bots: UseStateHandle<HashMap<String, BotItem>> = use_state(|| HashMap::new());
-    let loaded_bots_clone = loaded_bots.clone();
-    {
-        use_interval(move || {
-            let value = loaded_bots_clone.clone();
-            spawn_local(async move {
-                let args = serde_wasm_bindgen
-                    ::to_value(
-                        &(FetchBotsArgs {
-                            filter_ids: value.keys().cloned().collect(),
-                        })
-                    )
-                    .unwrap();
+    // let loaded_bots: UseStateHandle<HashMap<String, BotItem>> = use_state(|| HashMap::new());
+    // let loaded_bots_clone = loaded_bots.clone();
+    // {
+    //     use_interval(move || {
+    //         let value = loaded_bots_clone.clone();
+    //         spawn_local(async move {
+    //             let args = serde_wasm_bindgen
+    //                 ::to_value(
+    //                     &(FetchBotsArgs {
+    //                         filter_ids: value.keys().cloned().collect(),
+    //                     })
+    //                 )
+    //                 .unwrap();
 
-                let new_bots_string = invoke("get_bot_items", args).await.as_string().unwrap();
-                let new_bots: HashMap<String, BotItem> = serde_json
-                    ::from_str(&new_bots_string)
-                    .unwrap();
+    //             let new_bots_string = invoke("get_bot_items", args).await.as_string().unwrap();
+    //             let new_bots: HashMap<String, BotItem> = serde_json
+    //                 ::from_str(&new_bots_string)
+    //                 .unwrap();
 
-                let updated_bots: HashMap<String, BotItem> = (*value)
-                    .clone()
-                    .into_iter()
-                    .chain(new_bots.into_iter())
-                    .collect();
+    //             let updated_bots: HashMap<String, BotItem> = (*value)
+    //                 .clone()
+    //                 .into_iter()
+    //                 .chain(new_bots.into_iter())
+    //                 .collect();
 
-                value.set(updated_bots);
-            });
-        }, 1000);
-    }
+    //             value.set(updated_bots);
+    //         });
+    //     }, 1000);
+    // }
     let greet_input_ref = use_node_ref();
 
     let name = use_state(|| String::new());
@@ -127,11 +127,11 @@ pub fn app() -> Html {
             //     <BotComponent bot_item={{bot_item}} />
             // </div>
             <div>
-            {loaded_bots.values().cloned().map(|bot_item| {
-                html! {
-                    <BotComponent bot_item={bot_item.clone()} />
-                }
-            }).collect::<Html>()}
+            // {loaded_bots.values().cloned().map(|bot_item| {
+            //     html! {
+            //         <BotComponent bot_item={bot_item.clone()} />
+            //     }
+            // }).collect::<Html>()}
         </div>
         </main>
     }

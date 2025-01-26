@@ -19,4 +19,4 @@ panic = "abort"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-shared = { path = "../shared" }
+# shared = { path = "../shared" }

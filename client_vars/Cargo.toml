@@ -17,9 +17,9 @@ debug-assertions = false
 panic = "abort"
 
 [build-dependencies]
-rand = "0.8.5"
+rand = "0.8"
 
 [dependencies]
-obfstr = "0.4.4"
-serde = "1.0.217"
+obfstr = "0.4"
+serde = "1"
 shared = { path = "../shared" }

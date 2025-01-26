@@ -14,22 +14,22 @@ incremental = false
 panic = "abort"
 
 [build-dependencies]
-rand = "0.8.5"
+rand = "0.8"
 
 [package.metadata.cargo-post.dependencies]
-regex = "1.11.1"
-memmap2 = "0.9.5"
-walkdir = "2.5.0"
-rand = "0.8.5"
+regex = "1"
+memmap2 = "0.9"
+walkdir = "2"
+rand = "0.8"
 
 [dependencies]
-lazy_static = "1.5.0"
-windows-service = "0.7.0"
-windows-service-detector = "0.1.0"
+lazy_static = "1"
+windows-service = "0.7"
+windows-service-detector = "0.1"
 shared = { path = "../shared" }
 loader_vars = { path = "../loader_vars" }
-obfstr = "0.4.4"
-anyhow = "1.0.95"
-serde_json = "1.0.137"
-tokio = "1.43.0"
+obfstr = "0.4"
+anyhow = "1"
+serde_json = "1"
+tokio = "1"
 serde = "1"

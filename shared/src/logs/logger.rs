@@ -15,6 +15,8 @@ macro_rules! ref_log_internal {
         {
            
             $logger.log($level, obfstr::obfstr!($s));
+            println!("{:#?}",$s);
+
             
         }
     };
@@ -27,7 +29,8 @@ macro_rules! ref_log_internal {
     ) => {
         {
             $logger.log($level, &format!("{}{:#?}", obfstr::obfstr!($fmt), $($arg)*));
-            
+            println!("{}{:#?}", $fmt, $($arg)*);
+
         }
     };
 }

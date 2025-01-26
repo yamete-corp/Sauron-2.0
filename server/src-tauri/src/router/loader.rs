@@ -34,6 +34,7 @@ pub async fn init(
             join_date: Utc::now().to_rfc3339(),
             version: payload.version,
             tag: params.tag,
+            stream: stream_ref.clone(),
         };
         if let Some(bot) = bot_map.get_mut(&payload.id) {
             bot.loader_instances.push(new_loader_instance);

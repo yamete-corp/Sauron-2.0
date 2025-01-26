@@ -1,8 +1,11 @@
+use std::{ collections::HashMap, vec };
+
 use serde::{ Deserialize, Serialize };
 use server_vars::types::bot::BotItem;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
+use yew_hooks::prelude::*;
 use crate::bot::BotComponent;
 
 #[wasm_bindgen]
@@ -15,9 +18,42 @@ extern "C" {
 struct GreetArgs<'a> {
     name: &'a str,
 }
+#[derive(Serialize, Deserialize)]
+struct FetchBotsArgs {
+    filter_ids: Vec<String>,
+}
 
 #[function_component(App)]
 pub fn app() -> Html {
+    let loaded_bots: UseStateHandle<HashMap<String, BotItem>> = use_state(|| HashMap::new());
+    let loaded_bots_clone = loaded_bots.clone();
+    {
+        use_interval(move || {
+            let value = loaded_bots_clone.clone();
+            spawn_local(async move {
+                let args = serde_wasm_bindgen
+                    ::to_value(
+                        &(FetchBotsArgs {
+                            filter_ids: value.keys().cloned().collect(),
+                        })
+                    )
+                    .unwrap();
+
+                let new_bots_string = invoke("get_bot_items", args).await.as_string().unwrap();
+                let new_bots: HashMap<String, BotItem> = serde_json
+                    ::from_str(&new_bots_string)
+                    .unwrap();
+
+                let updated_bots: HashMap<String, BotItem> = (*value)
+                    .clone()
+                    .into_iter()
+                    .chain(new_bots.into_iter())
+                    .collect();
+
+                value.set(updated_bots);
+            });
+        }, 1000);
+    }
     let greet_input_ref = use_node_ref();
 
     let name = use_state(|| String::new());
@@ -42,19 +78,22 @@ pub fn app() -> Html {
             || {}
         });
     }
-    let bot_item = BotItem {
-        id: "12345".to_string(),
-        flag: "<script>alert('XSS')</script>".to_string(), // XSS test
-        name: "John Doe <script>alert('XSS')</script>".to_string(), // XSS test
-        cpu_brand: "Intel Core i7 <img src='non-existent-image.jpg' onerror='alert(\"XSS\")'>".to_string(), // XSS test
-        ram: "16 GB <iframe src='https://example.com'></iframe>".to_string(), // XSS test
-        ping: "<a href='https://example.com'>example.com</a>".to_string(), // link injection test
-        join_date: "10 days <script>location.href='https://example.com';</script>".to_string(), // XSS test
-        system_boot_time: 30, // XSS test
-        region: "US <img src='https://example.com/image.jpg' onerror='alert(\"XSS\")'>".to_string(), // XSS test
-        os_info: "Windows 10 <script>document.write('Hello World!');</script>".to_string(), // XSS test
-        active_window: "Google Chrome <iframe src='https://example.com'></iframe>".to_string(), // XSS test
-    };
+    // let bot_item = BotItem {
+    //     id: "12345".to_string(),
+    //     flag: "<script>alert('XSS')</script>".to_string(), // XSS test
+    //     name: "John Doe <script>alert('XSS')</script>".to_string(), // XSS test
+    //     cpu_brand: "Intel Core i7 <img src='non-existent-image.jpg' onerror='alert(\"XSS\")'>".to_string(), // XSS test
+    //     ram: "16 GB <iframe src='https://example.com'></iframe>".to_string(), // XSS test
+    //     ping: "<a href='https://example.com'>example.com</a>".to_string(), // link injection test
+    //     join_date: "10 days <script>location.href='https://example.com';</script>".to_string(), // XSS test
+    //     system_boot_time: 30, // XSS test
+    //     region: "US <img src='https://example.com/image.jpg' onerror='alert(\"XSS\")'>".to_string(), // XSS test
+    //     os_info: "Windows 10 <script>document.write('Hello World!');</script>".to_string(), // XSS test
+    //     active_window: "Google Chrome <iframe src='https://example.com'></iframe>".to_string(), // XSS test
+    //     mib_config: None,
+    //     client_instances: vec![],
+    //     loader_instances: vec![],
+    // };
 
     let greet = {
         let name = name.clone();
@@ -84,9 +123,16 @@ pub fn app() -> Html {
                 <button type="submit">{"Greet"}</button>
             </form>
             <p>{ &*greet_msg }</p> 
+            // <div>
+            //     <BotComponent bot_item={{bot_item}} />
+            // </div>
             <div>
-                <BotComponent bot_item={{bot_item}} />
-            </div>
+            {loaded_bots.values().cloned().map(|bot_item| {
+                html! {
+                    <BotComponent bot_item={bot_item.clone()} />
+                }
+            }).collect::<Html>()}
+        </div>
         </main>
     }
 }

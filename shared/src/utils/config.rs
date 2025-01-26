@@ -9,7 +9,7 @@ use super::{
 };
 use anyhow::Result;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct HstCnfg {
     pub version: u64,
     pub folder_path: String,
@@ -17,7 +17,7 @@ pub struct HstCnfg {
     pub config_path: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct MibCnfg {
     pub cln_up_done: bool,
     pub ldrs: Vec<HstCnfg>,

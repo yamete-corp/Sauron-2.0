@@ -31,9 +31,13 @@ pub fn get_thumbnail() -> Result<Vec<u8>> {
         .ok_or_else(|| anyhow::anyhow!(s!("No primary screen found").to_string()))?;
     let image_buffer = primary_screen.capture().context("Failed to capture screen")?;
 
-    let image = image::DynamicImage::ImageRgba8(image_buffer);
-    let thumbnail = image.resize(256, 144, image::imageops::FilterType::Lanczos3);
-    let mut buffer = Cursor::new(Vec::new());
+    let image: image::DynamicImage = image::DynamicImage::ImageRgba8(image_buffer);
+    let thumbnail: image::DynamicImage = image.resize(
+        256,
+        144,
+        image::imageops::FilterType::Lanczos3
+    );
+    let mut buffer: Cursor<Vec<u8>> = Cursor::new(Vec::new());
     thumbnail.write_to(&mut buffer, image::ImageFormat::Jpeg)?;
     Ok(buffer.into_inner())
 }

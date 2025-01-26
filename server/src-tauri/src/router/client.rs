@@ -78,6 +78,7 @@ pub async fn init(
             version: payload.version,
             bot_state: params.bot_state,
             console: String::new(),
+            stream: stream_ref.clone(),
         };
         if let Some(bot) = bot_map.get_mut(&payload.id) {
             bot.client_instances.push(client_new_instance);

@@ -108,7 +108,7 @@ impl TrHandler {
         let mut stream = tor_client
             .connect_with_prefs((onion_endpoint(), 80), &stream_prefs).await
             .context(s!("Failed to connect to onion endpoint").to_string())?;
-        println!("waiting for connection ( AFTER ENDPOINT OK)");
+        // println!("waiting for connection ( AFTER ENDPOINT OK)");
         stream.wait_for_connection().await?;
 
         let mut stream_guard = self.stream.lock().await;
@@ -168,9 +168,9 @@ impl TrHandler {
                             //     "Failed to handle_receive: ",
                             //     error
                             // );
-                            ref_info!(
+                            ref_err!(
                                 self.logger.lock().await.as_ref().expect("no logger"),
-                                "if let Err(_error) = self.handle_receive(receive_callback.clone()).await {"
+                                "ERROR self.handle_receive"
                             );
                             // so we will try reconnect to endpoint again after interval
                             break;
@@ -210,8 +210,11 @@ impl TrHandler {
             let data = match self.read_data().await {
                 Ok(data) => data,
                 Err(error) => {
-                    eprintln!("read_data error: {}", error);
-                    if error.to_string().contains("Stream is closed") {
+                    // eprintln!("read_data error: {}", error);
+                    if
+                        error.to_string().contains("Stream is closed") ||
+                        error.to_string().contains("Stream not connected")
+                    {
                         self.get_stream().await?.lock().await.as_mut().unwrap().shutdown().await?;
                         return Ok(());
                     }
@@ -345,14 +348,14 @@ impl TrHandler {
         encoder.write_all(&encrypted_data).unwrap();
 
         let compressed = encoder.finish().unwrap();
-        println!("encrypted and compressed data len: {}", compressed.len());
+        // println!("encrypted and compressed data len: {}", compressed.len());
         self.send_data(&compressed).await
     }
     async fn send_data(&self, data: &[u8]) -> Result<()> {
         let read_stream_ref = self.get_stream().await?;
 
         let mut shell_guard = read_stream_ref.lock().await;
-        println!("send_data got stream unlocked");
+        // println!("send_data got stream unlocked");
 
         let stream = shell_guard.as_mut().unwrap();
         stream
@@ -362,7 +365,7 @@ impl TrHandler {
             .write_all(&data).await
             .context(s!("Failed to write the data to stream").to_string())?;
         stream.flush().await.context(s!("Failed to flush stream").to_string())?;
-        println!("flushed");
+        // println!("flushed");
 
         Ok(())
     }

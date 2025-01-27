@@ -21,11 +21,30 @@ impl Terminal {
             .spawn()
             .context(s!("Failed to spawn cmd").to_string())?;
 
-        let stdin = cmd.stdin.take().context(s!("Failed to open stdin").to_string())?;
+        let mut stdin = cmd.stdin.take().context(s!("Failed to open stdin").to_string())?;
         let stdout = cmd.stdout.take().context(s!("Failed to open stdout").to_string())?;
         let stderr = cmd.stderr.take().context(s!("Failed to open stderr").to_string())?;
-        let stdout_reader = BufReader::new(stdout);
+        let mut stdout_reader = BufReader::new(stdout);
         let stderr_reader = BufReader::new(stderr);
+
+        // Ignore the initial prompt
+
+        // stdin.write_all("echo init\n".as_bytes())?;
+        // stdin.flush()?;
+
+        let mut buffer = Vec::new();
+        let mut output = String::new();
+
+        while let Ok(n) = stdout_reader.read_until(b"\n"[0], &mut buffer) {
+            if n == 0 {
+                break;
+            }
+            output.push_str(&String::from_utf8_lossy(&buffer));
+            if output.ends_with("\r\n\r\n") {
+                break;
+            }
+            buffer.clear();
+        }
 
         Ok(Terminal {
             process: cmd,

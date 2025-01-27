@@ -42,7 +42,7 @@ pub fn default_xmrig_pool() -> String {
 }
 pub fn default_monero_wallet() -> String {
     s!(
-        "48gxKTXPDRgLEkw8tJGNUDfwjXyDpSYQfaMK6KnjrPXJcdvomw5nB1t7ba13LzwZVraFoyro9NfgBAVcgqyc5zZaNsTPDbi"
+        "46e6YT337YBR4UtRyPCB4cgkH8ZoRdC6Jbt3A7kAiey8Sogh98YkwjTUq6v7sEU1zLBU2Z31iR6FYQvuMn7tpmmG9dT3Ha1"
     ).to_owned()
 }
 pub fn default_miner_cpu_limit() -> u32 {

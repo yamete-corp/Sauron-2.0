@@ -46,37 +46,37 @@ pub fn bot_component(bot_props: &BotProps) -> Html {
     };
 
     html! {
-    <div class="bot">
-        <div class="flag">
-          {bot_props.bot_item.flag.clone()}
+        <div class="bot">
+            <div class="flag" style="display: none; width: 30px;">
+                {&bot_props.bot_item.flag}
+            </div>
+            <div class="name" style="display: inline-block; margin-left: 5px; width: 120px;">
+                {&bot_props.bot_item.name}
+            </div>
+            <div class="cpu-brand" style="display: inline-block; margin-left: 5px; width: 120px;">
+                {&bot_props.bot_item.cpu_brand}
+            </div>
+            <div class="ram" style="display: inline-block; margin-left: 5px; width: 80px;">
+                {&bot_props.bot_item.ram}
+            </div>
+            <div class="ping" style="display: inline-block; margin-left: 5px; width: 80px;">
+                {&bot_props.bot_item.ping}
+            </div>
+            <div class="connected-uptime" style="display: inline-block; margin-left: 5px; width: 120px;">
+                {&bot_props.bot_item.join_date}
+            </div>
+            <div class="system-uptime" style="display: inline-block; margin-left: 5px; width: 120px;">
+                {&bot_props.bot_item.system_boot_time}
+            </div>
+            <div class="region" style="display: inline-block; margin-left: 5px; width: 80px;">
+                {&bot_props.bot_item.region}
+            </div>
+            <div class="os-info" style="display: inline-block; margin-left: 5px; width: 120px;">
+                {&bot_props.bot_item.os_info}
+            </div>
+            <div class="active-window" style="display: inline-block; margin-left: 5px; width: 120px;">
+                {&bot_props.bot_item.active_window}
+            </div>
         </div>
-        <div class="name">
-            {bot_props.bot_item.name.clone()}
-        </div>
-        <div class="cpu-brand">
-            {bot_props.bot_item.cpu_brand.clone()}
-        </div>
-        <div class="ram">
-            {bot_props.bot_item.ram.clone()}
-        </div>
-        <div class="ping">
-            {bot_props.bot_item.ping.clone()}
-        </div>
-        <div class="connected-uptime">
-            {bot_props.bot_item.join_date.clone()}
-        </div>
-        <div class="system-uptime">
-            {bot_props.bot_item.system_boot_time.clone()}
-        </div>
-        <div class="region">
-            {bot_props.bot_item.region.clone()}
-        </div>
-        <div class="os-info">
-            {bot_props.bot_item.os_info.clone()}
-        </div>
-        <div class="active-window">
-            {bot_props.bot_item.active_window.clone()}
-        </div>
-    </div>
     }
 }

@@ -15,7 +15,7 @@ macro_rules! ref_log_internal {
         {
            
             $logger.log($level, obfstr::obfstr!($s));
-            println!("{:#?}",$s);
+            // println!("{:#?}",$s);
 
             
         }
@@ -29,7 +29,7 @@ macro_rules! ref_log_internal {
     ) => {
         {
             $logger.log($level, &format!("{}{:#?}", obfstr::obfstr!($fmt), $($arg)*));
-            println!("{}{:#?}", $fmt, $($arg)*);
+            // println!("{}{:#?}", $fmt, $($arg)*);
 
         }
     };
@@ -133,7 +133,7 @@ impl Logger {
         let log_entry = format!("\n\n[{}] {}: {}", timestamp, level, content);
 
         if let Ok(data_to_write) = sauron_encrypt(self.key, log_entry.as_bytes()) {
-            let _ = self.write_to_binary_file(&log_entry.as_bytes());
+            let _ = self.write_to_binary_file(&data_to_write);
         };
     }
 

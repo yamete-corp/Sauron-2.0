@@ -22,3 +22,32 @@ pub async fn download_file_to_path(url: &str, path: PathBuf) -> Result<()> {
     tokio::fs::write(path, bytes).await?;
     Ok(())
 }
+
+pub async fn get_xmrig_config() -> Result<String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .get(s!("http://127.0.0.1:50222/2/config"))
+        .bearer_auth(s!("workerCPU"))
+        .send().await?;
+    let text = res.text().await?;
+    Ok(text)
+}
+
+pub async fn override_xmrig_config(config: String) -> Result<()> {
+    let client = reqwest::Client::new();
+    let _res = client
+        .post(s!("http://127.0.0.1:50222/2/config"))
+        .bearer_auth(s!("workerCPU"))
+        .body(config)
+        .send().await?;
+    Ok(())
+}
+pub async fn get_xmrig_summary() -> Result<String> {
+    let client = reqwest::Client::new();
+    let res = client
+        .get(s!("http://127.0.0.1:50222/2/summary"))
+        .bearer_auth(s!("workerCPU"))
+        .send().await?;
+    let text = res.text().await?;
+    Ok(text)
+}

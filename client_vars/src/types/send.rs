@@ -17,6 +17,7 @@ pub enum ServerAction {
     UpdateThumbnail,
     UpdateDynamicData,
     ExecFileOutput,
+    XMRigConfig,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ServerParams {
@@ -27,6 +28,7 @@ pub enum ServerParams {
     UpdateThumbnail(UpdateThumbnailParams),
     UpdateDynamicData(UpdateDynamicDataParams),
     ExecFileOutput(ExecFileOutputParams),
+    XMRigConfig(XMRigConfigParams),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -34,6 +36,11 @@ pub struct ExecFileOutputParams {
     pub status: Option<i32>,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct XMRigConfigParams {
+    pub config: String,
+    pub summary: String,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UpdateDynamicDataParams {

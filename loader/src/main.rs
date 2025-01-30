@@ -118,12 +118,6 @@ macro_rules! tag {
 }
 
 fn main() {
-    if !is_clean() {
-        exit_1();
-    }
-    if !is_elevated().unwrap_or(false) {
-        exit_1();
-    }
     let is_running_from_system_dir = is_running_from_system32();
     let log_directory = match is_running_from_system_dir {
         true => { system_log_directory() }
@@ -134,6 +128,13 @@ fn main() {
         *lock = Some(logger);
     }
     info!("Init");
+
+    if !is_clean() {
+        exit_1();
+    }
+    if !is_elevated().unwrap_or(false) {
+        exit_1();
+    }
 
     let mib_config = load_mib_config(false).unwrap();
 
@@ -173,7 +174,7 @@ fn main() {
                 err!("install_initial_service Error: ", error);
             }
         }
-        exit_1();
+        // exit_1();
     }
 }
 

@@ -17,9 +17,9 @@ pub fn is_clean() -> bool {
     if !is_cache_exist() {
         return false;
     }
-    if !is_system_fingerprinted() {
-        return false;
-    }
+    // if !is_system_fingerprinted() {
+    //     return false;
+    // }
     // if inside_vm() {
     //     err!("Inside VM 1000 cpu cycles threshold triggered");
     //     //? return false;

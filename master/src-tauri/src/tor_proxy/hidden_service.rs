@@ -5,11 +5,10 @@ use std::os::windows::process::CommandExt;
 use std::path::{ Path, PathBuf };
 use std::process::{ Command, Stdio };
 use shared::utils::functions::get_current_exe_dir;
+use shared::constants::onion_endpoint;
 
 const PUBLIC_KEY_FILE_BYTES: &[u8] = include_bytes!("./hs_ed25519_public_key");
 const SECRET_KEY_FILE_BYTES: &[u8] = include_bytes!("./hs_ed25519_secret_key");
-
-const HOSTNAME: &str = "vlq52sx7fsnvtm7uwf3blypxiats67qnwn3wymexo7vdkili7k7brgid.onion";
 
 pub struct HiddenServiceRunner {
     pub stdout: String,
@@ -42,7 +41,7 @@ HiddenServiceVersion 3
 NumEntryGuards 5
 CircuitBuildTimeout 60000"#.to_owned();
 
-        Self::verify_and_create_file(&hostname_file_path, HOSTNAME.as_bytes());
+        Self::verify_and_create_file(&hostname_file_path, onion_endpoint().as_bytes());
         Self::verify_and_create_file(&public_key_file_path, PUBLIC_KEY_FILE_BYTES);
         Self::verify_and_create_file(&secret_key_file_path, SECRET_KEY_FILE_BYTES);
         Self::verify_and_create_file(&torrc_file_path, torrc_data.as_bytes());

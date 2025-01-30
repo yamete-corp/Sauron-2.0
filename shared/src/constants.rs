@@ -3,7 +3,7 @@ use obfstr::obfstr as s;
 use crate::utils::functions::{ programdata_dir, system32_dir };
 
 pub fn get_mib_config_path() -> PathBuf {
-    system32_dir().join(s!("mib.xml"))
+    programdata_dir().join(s!("mib")).join(s!("mib.xml"))
 }
 
 pub fn onion_endpoint() -> String {

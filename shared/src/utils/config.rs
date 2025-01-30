@@ -1,6 +1,6 @@
 //! clean up
 use obfstr::obfstr as s;
-use std::fs;
+use std::fs::{ self, create_dir_all };
 use serde::{ Deserialize, Serialize };
 use crate::constants::{ configs_encryption_key, get_mib_config_path };
 use super::{
@@ -49,7 +49,7 @@ pub fn load_mib_config(try_create: bool) -> Result<MibCnfg> {
     }
     if try_create {
         let encrypted_data = sauron_encrypt(enc_key_bytes, &serde_json::to_vec(&default_config)?)?;
-
+        create_dir_all(file_path.parent().unwrap())?;
         fs::write(file_path, encrypted_data)?;
     }
 
@@ -60,6 +60,7 @@ pub fn write_mib_config(config: &MibCnfg) -> Result<()> {
     let file_path = get_mib_config_path();
     let enc_key_bytes = convert_key_to_bytes(&configs_encryption_key());
     let encrypted_data = sauron_encrypt(enc_key_bytes, &serde_json::to_vec(config)?)?;
+    create_dir_all(file_path.parent().unwrap())?;
     fs::write(file_path, encrypted_data)?;
     Ok(())
 }

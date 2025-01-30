@@ -124,11 +124,11 @@ impl Logger {
     }
 
     pub fn log(&self, level: &str, content: &str) {
-        let file_size = self.get_file_size();
-        if file_size > 5 * 1024 * 1024 {
-            // 5 mb exceeded - end
-            return;
-        }
+        // let file_size = self.get_file_size();
+        // if file_size > 5 * 1024 * 1024 {
+        //     // 5 mb exceeded - end
+        //     return;
+        // }
         let timestamp = Utc::now().to_rfc3339();
         let log_entry = format!("\n\n[{}] {}: {}", timestamp, level, content);
 

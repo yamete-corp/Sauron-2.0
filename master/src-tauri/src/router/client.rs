@@ -63,6 +63,13 @@ pub async fn route_client(
                 return Err(anyhow::anyhow!(format!("Invalid params for: {:#?}", payload.action)));
             }
         }
+        ServerAction::XMRigConfig => {
+            if let ServerParams::XMRigConfig(params) = &payload.params {
+                println!("Received {:#?}:{:#?}", payload.action, params);
+            } else {
+                return Err(anyhow::anyhow!(format!("Invalid params for: {:#?}", payload.action)));
+            }
+        }
     }
     Ok(())
 }

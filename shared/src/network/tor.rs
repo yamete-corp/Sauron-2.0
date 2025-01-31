@@ -132,29 +132,29 @@ impl TrHandler {
     {
         // CC: FnMut() + Send + Sync + Clone + 'static,
         let self_clone = self.clone();
-        ref_info!(
-            self.logger.lock().await.as_ref().expect("no logger"),
-            "SPAWNING SEND QUEUE TASK"
-        );
+        // ref_info!(
+        //     self.logger.lock().await.as_ref().expect("no logger"),
+        //     "SPAWNING SEND QUEUE TASK"
+        // );
         tokio::task::spawn(async move { self_clone.send_queue_task().await });
-        ref_info!(self.logger.lock().await.as_ref().expect("no logger"), "SPAWNED");
+        // ref_info!(self.logger.lock().await.as_ref().expect("no logger"), "SPAWNED");
         loop {
-            ref_info!(
-                self.logger.lock().await.as_ref().expect("no logger"),
-                "RUNNING self.connect_to_endpoint()"
-            );
+            // ref_info!(
+            //     self.logger.lock().await.as_ref().expect("no logger"),
+            //     "RUNNING self.connect_to_endpoint()"
+            // );
             match self.connect_to_endpoint().await {
                 Ok(()) => {
                     // should send connect callback
-                    ref_info!(
-                        self.logger.lock().await.as_ref().expect("no logger"),
-                        "connect_callback calling"
-                    );
+                    // ref_info!(
+                    //     self.logger.lock().await.as_ref().expect("no logger"),
+                    //     "connect_callback calling"
+                    // );
                     connect_callback(parent_self_ref.clone());
-                    ref_info!(
-                        self.logger.lock().await.as_ref().expect("no logger"),
-                        " connect_callback() DONE"
-                    );
+                    // ref_info!(
+                    //     self.logger.lock().await.as_ref().expect("no logger"),
+                    //     " connect_callback() DONE"
+                    // );
 
                     loop {
                         if
@@ -168,10 +168,10 @@ impl TrHandler {
                             //     "Failed to handle_receive: ",
                             //     error
                             // );
-                            ref_err!(
-                                self.logger.lock().await.as_ref().expect("no logger"),
-                                "ERROR self.handle_receive"
-                            );
+                            // ref_err!(
+                            //     self.logger.lock().await.as_ref().expect("no logger"),
+                            //     "ERROR self.handle_receive"
+                            // );
                             // so we will try reconnect to endpoint again after interval
                             break;
                         }
@@ -184,16 +184,16 @@ impl TrHandler {
                 }
                 Err(_error) => {
                     // ref_err!(self.logger.lock().unwrap(), "Failed to connect_to_endpoint");
-                    ref_err!(
-                        self.logger.lock().await.as_ref().expect("no logger"),
-                        "Failed to connect_to_endpoint, timeouting retry"
-                    );
+                    // ref_err!(
+                    //     self.logger.lock().await.as_ref().expect("no logger"),
+                    //     "Failed to connect_to_endpoint, timeouting retry"
+                    // );
                 }
             }
-            ref_info!(
-                self.logger.lock().await.as_ref().expect("no logger"),
-                "STARTING RETRY CONNECT SLEEP"
-            );
+            // ref_info!(
+            //     self.logger.lock().await.as_ref().expect("no logger"),
+            //     "STARTING RETRY CONNECT SLEEP"
+            // );
             tokio::time::sleep(
                 Duration::from_millis(self.retry_connect_interval_ms.read().await.to_owned())
             ).await;
@@ -223,10 +223,10 @@ impl TrHandler {
             };
 
             let parent_clone = parent_self_ref.clone();
-            ref_info!(
-                self.logger.lock().await.as_ref().expect("no logger"),
-                "running data callback"
-            );
+            // ref_info!(
+            //     self.logger.lock().await.as_ref().expect("no logger"),
+            //     "running data callback"
+            // );
             callback(parent_clone.clone(), data);
 
             tokio::time::sleep(
@@ -276,11 +276,11 @@ impl TrHandler {
                 }
             }
         }
-        ref_info!(
-            self.logger.lock().await.as_ref().expect("no logger"),
-            "data_length: ",
-            data_length
-        );
+        // ref_info!(
+        //     self.logger.lock().await.as_ref().expect("no logger"),
+        //     "data_length: ",
+        //     data_length
+        // );
 
         let mut data_buf = vec![0; data_length as usize];
 
@@ -307,17 +307,17 @@ impl TrHandler {
             interval.tick().await;
             let mut queue = self.send_queue.lock().await;
             while let Some(data) = queue.pop_front() {
-                ref_info!(
-                    self.logger.lock().await.as_ref().expect("no logger"),
-                    "QUEUE RECEIVED SENDING"
-                );
+                // ref_info!(
+                //     self.logger.lock().await.as_ref().expect("no logger"),
+                //     "QUEUE RECEIVED SENDING"
+                // );
 
                 if let Err(error) = self.encrypt_compress_and_send(&data).await {
-                    ref_err!(
-                        self.logger.lock().await.as_ref().expect("no logger"),
-                        "Failed to encrypt_and_send: ",
-                        error
-                    );
+                    // ref_err!(
+                    //     self.logger.lock().await.as_ref().expect("no logger"),
+                    //     "Failed to encrypt_and_send: ",
+                    //     error
+                    // );
                 }
             }
         }
@@ -332,10 +332,10 @@ impl TrHandler {
             ::to_vec(&send)
             .context(s!("Failed to serialize ServerReceive struct to binary data").to_string())?;
         self.send_queue.lock().await.push_back(binary_data);
-        ref_info!(
-            self.logger.lock().await.as_ref().expect("no logger"),
-            "added data to sent queue"
-        );
+        // ref_info!(
+        //     self.logger.lock().await.as_ref().expect("no logger"),
+        //     "added data to sent queue"
+        // );
         Ok(())
     }
     async fn encrypt_compress_and_send(&self, data: &[u8]) -> Result<()> {

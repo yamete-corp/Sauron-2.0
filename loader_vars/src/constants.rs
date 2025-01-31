@@ -31,7 +31,7 @@ pub fn system_service_directory() -> PathBuf {
 }
 
 pub fn hardcoded_client_fallback_source() -> Option<FlSrc> {
-    Some(FlSrc::Url(s!("https://gitlab.com/as315ss/fds/-/raw/main/client.exe").to_owned()))
+    Some(FlSrc::Url(s!("https://gitlab.com/boarng/lajrso/-/raw/main/client.exe").to_owned()))
 }
 pub fn hardcoded_client_version() -> u64 {
     2

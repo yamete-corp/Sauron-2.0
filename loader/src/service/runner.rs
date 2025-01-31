@@ -234,7 +234,9 @@ fn system_service_work() -> Result<()> {
     info!("run config pre tor handler");
 
     // always run default - if theres already installed - we just run the apps, if higher versions also run those
-    run_config(RnCnfgPrms::default())?;
+    if let Err(error) = run_config(RnCnfgPrms::default()) {
+        err!("run_config RnCnfgPrms::default() Error: ", error);
+    }
     info!("run config done");
     tokio::runtime::Builder
         ::new_multi_thread()

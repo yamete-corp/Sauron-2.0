@@ -2,39 +2,37 @@ export interface BotItem {
   id: string;
   flag: string;
   name: string;
-  cpuBrand: string;
+  cpu_brand: string;
   ram: string;
   ping: string;
-  joinDate: string;
-  systemBootTime: number;
+  join_date: string;
+  system_boot_time: number;
   region: string;
-  osInfo: string;
-  activeWindow: string;
-  mibConfig: MibCnfg | null;
-  clientInstances: FrontendClientInstance[];
-  loaderInstances: FrontendLoaderInstance[];
+  os_info: string;
+  active_window: string;
+  client_instances: FrontendClientInstance[];
+  loader_instances: FrontendLoaderInstance[];
 }
 
 export interface FrontendClientInstance {
-  joinDate: string;
+  join_date: string;
   version: number;
 }
 
 export interface FrontendLoaderInstance {
-  joinDate: string;
+  join_date: string;
   version: number;
   tag: string;
 }
-
 export interface HstCnfg {
   version: number;
-  folderPath: string;
-  exePath: string;
-  configPath: string;
+  folder_path: string;
+  exe_path: string;
+  config_path: string;
 }
 
 export interface MibCnfg {
-  cleanupDone: boolean;
-  loaders: HstCnfg[];
-  clients: HstCnfg[];
+  cln_up_done: boolean;
+  ldrs: HstCnfg[];
+  clnts: HstCnfg[];
 }

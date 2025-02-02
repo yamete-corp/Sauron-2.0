@@ -17,6 +17,17 @@ pub struct HstCnfg {
     pub config_path: String,
 }
 
+impl Default for HstCnfg {
+    fn default() -> Self {
+        Self {
+            version: 0,
+            folder_path: String::new(),
+            exe_path: String::new(),
+            config_path: String::new(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct MibCnfg {
     pub cln_up_done: bool,

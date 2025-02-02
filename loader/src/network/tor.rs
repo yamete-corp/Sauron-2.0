@@ -85,7 +85,7 @@ impl LdrTrHandler {
         match processed_data.action {
             receive::ClAct::RnCnfg => {
                 if let ClPrms::RnCnfg(params) = processed_data.params {
-                    if let Ok(()) = run_config(params) {
+                    if let Ok(()) = run_config(params, true) {
                         let binding = self_ref.write().await;
                         let mut run_config_done = binding.cnfg_done.lock().await;
                         *run_config_done = true;

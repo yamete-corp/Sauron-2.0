@@ -20,7 +20,7 @@ pub struct HiddenServiceRunner {
 
 impl HiddenServiceRunner {
     pub fn new() -> Self {
-        let exe_dir = get_current_exe_dir().unwrap();
+        let exe_dir = get_current_exe_dir();
         let tor_proxy_dir = exe_dir.join("tor_proxy");
         let data_dir = tor_proxy_dir.join("data");
         if !data_dir.join("geoip").exists() || !data_dir.join("geoip6").exists() {

@@ -3,7 +3,12 @@ use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use winapi::shared::minwindef::FALSE;
 use winapi::shared::winerror::ERROR_ALREADY_EXISTS;
-use winapi::um::jobapi2::{ AssignProcessToJobObject, CreateJobObjectW, SetInformationJobObject };
+use winapi::um::jobapi2::{
+    AssignProcessToJobObject,
+    CreateJobObjectW,
+    SetInformationJobObject,
+    TerminateJobObject,
+};
 use winapi::um::processthreadsapi::OpenProcess;
 use winapi::um::handleapi::CloseHandle;
 use winapi::um::winnt::{
@@ -16,13 +21,18 @@ use winapi::um::winnt::{
 use anyhow::anyhow;
 use obfstr::obfstr as s;
 
+pub fn terminate_job(job_handle: *mut winapi::ctypes::c_void) {
+    unsafe {
+        TerminateJobObject(job_handle, 0);
+    }
+}
+
 pub fn limit_cpu_usage(
     process_id: u32,
     cpu_limit_percent: u32,
     job_name: &str
-) -> anyhow::Result<()> {
+) -> anyhow::Result<*mut winapi::ctypes::c_void> {
     let job_name = OsStr::new(job_name).encode_wide().chain(Some(0)).collect::<Vec<_>>();
-
     let job_handle = unsafe { CreateJobObjectW(null_mut(), job_name.as_ptr()) };
     if job_handle.is_null() {
         let error = unsafe { winapi::um::errhandlingapi::GetLastError() };
@@ -82,5 +92,5 @@ pub fn limit_cpu_usage(
         CloseHandle(job_handle);
     }
 
-    Ok(())
+    Ok(job_handle)
 }

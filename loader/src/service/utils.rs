@@ -86,10 +86,10 @@ pub fn delete_service(service_name: &str) -> Result<()> {
 
 pub fn install_initial_service() -> Result<()> {
     let service_name = loader_service_name();
-    let exe_path = get_current_exe()?;
+    let exe_path = get_current_exe();
     let (state, service_exe_path) = get_service_install_state(
         &service_name,
-        exe_path.to_str().unwrap()
+        exe_path.to_str().context(s!("Failed to convert pathbuf to_str").to_owned())?
     )?;
     match state {
         SrvcIstlState::DoesntExist => {}
@@ -121,10 +121,10 @@ pub fn install_initial_service() -> Result<()> {
 // this is only called after cleanup - update installations is for later
 pub fn install_system_service() -> Result<()> {
     let service_name = loader_service_name();
-    let exe_path = get_current_exe()?;
+    let exe_path = get_current_exe();
     let (state, service_exe_path) = get_service_install_state(
         &service_name,
-        exe_path.to_str().unwrap()
+        exe_path.to_str().context(s!("Failed to convert pathbuf to_str").to_owned())?
     )?;
     info!("State install service: ", &state);
 

@@ -31,9 +31,11 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
       label: "Console",
       onClick: async () => {
         console.log(botId);
-        const webview = new WebviewWindow("theUniqueLabel", {
+        const key = botId + ":" + botVersion;
+        const webview = new WebviewWindow(key, {
           url: "console.html",
-          title: botId + ":" + botVersion,
+          userAgent: key,
+          title: key,
         });
         webview.once("tauri://created", function () {
           // webview window successfully created

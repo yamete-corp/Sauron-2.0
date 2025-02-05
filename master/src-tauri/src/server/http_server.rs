@@ -185,6 +185,7 @@ impl ServerHandler {
                         }
                     };
                     // break loop when we read the data
+                    drop(stream);
                     break;
                 }
                 Err(error) => {

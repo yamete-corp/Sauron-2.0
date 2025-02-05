@@ -41,7 +41,7 @@ pub type SendQueue = VecDeque<Vec<u8>>;
 
 #[derive(Clone)]
 pub struct TrHandler {
-    pub logger: MutexPtr<Option<Logger>>,
+    // pub logger: MutexPtr<Option<Logger>>,
     pub dv_id: RwPtr<String>,
     tr_clnt: MutexPtr<TorClient<tor_rtcompat::PreferredRuntime>>,
     stream_prefs: RwPtr<StreamPrefs>,
@@ -70,30 +70,23 @@ pub enum LoggerCnfg {
     },
 }
 impl TrHandler {
-    pub async fn new(logger_config: LoggerCnfg) -> Result<Self> {
+    pub async fn new() -> Result<Self> {
         let config = TorClientConfig::default();
         let tor_client = TorClient::create_bootstrapped(config).await.context(
             s!("Failed to create Tor client").to_string()
         )?;
         let mut stream_prefs: StreamPrefs = StreamPrefs::default();
-        let logger = match logger_config {
-            LoggerCnfg::Existing(logger) => logger,
-            LoggerCnfg::New { log_dir: log_directory, log_enc_key: log_encryption_key } =>
-                Some(Logger::new(log_directory, log_encryption_key)?),
-        };
-        if let Some(lg) = &logger {
-            ref_tag!(lg, "TOR-HANDLER");
-        }
+
         stream_prefs.connect_to_onion_services(arti_client::config::BoolOrAuto::Explicit(true));
 
         let tor_handler = TrHandler {
             stream: Arc::new(Mutex::new(None)),
             dv_id: Arc::new(RwLock::new(fetch_constant_device_id())),
             send_queue: Arc::new(Mutex::new(VecDeque::new())),
-            logger: Arc::new(Mutex::new(logger)),
+            // logger: Arc::new(Mutex::new(logger)),
             tr_clnt: Arc::new(Mutex::new(tor_client)),
             stream_prefs: Arc::new(RwLock::new(stream_prefs)),
-            retry_connect_interval_ms: Arc::new(RwLock::new(1 * 60 * 1000)), // 1 minutes
+            retry_connect_interval_ms: Arc::new(RwLock::new(1 * 3 * 1000)), // 3 secs
             retry_read_stream_interval_ms: Arc::new(RwLock::new(100)),
             queue_tick_interval_ms: Arc::new(RwLock::new(10)),
         };
@@ -101,16 +94,13 @@ impl TrHandler {
         Ok(tor_handler)
     }
     pub async fn connect_to_endpoint(&mut self) -> Result<()> {
-        let tor_client: tokio::sync::MutexGuard<
-            '_,
-            TorClient<tor_rtcompat::PreferredRuntime>
-        > = self.tr_clnt.lock().await;
+        let tor_client = self.tr_clnt.lock().await;
         let stream_prefs = self.stream_prefs.read().await;
-        let mut stream = tor_client
-            .connect_with_prefs((onion_endpoint(), 80), &stream_prefs).await
-            .unwrap();
-        // .context(s!("Failed to connect to onion endpoint").to_string())?;
-        // println!("waiting for connection ( AFTER ENDPOINT OK)");
+        let mut stream = tor_client.connect_with_prefs(
+            (onion_endpoint(), 80),
+            &stream_prefs
+        ).await?;
+
         stream.wait_for_connection().await?;
 
         let mut stream_guard = self.stream.lock().await;
@@ -166,15 +156,6 @@ impl TrHandler {
                                 receive_callback.clone()
                             ).await
                         {
-                            // ref_err!(
-                            //     self.logger.lock().unwrap(),
-                            //     "Failed to handle_receive: ",
-                            //     error
-                            // );
-                            // ref_err!(
-                            //     self.logger.lock().await.as_ref().expect("no logger"),
-                            //     "ERROR self.handle_receive"
-                            // );
                             // so we will try reconnect to endpoint again after interval
                             break;
                         }
@@ -218,7 +199,12 @@ impl TrHandler {
                         error.to_string().contains("Stream is closed") ||
                         error.to_string().contains("Stream not connected")
                     {
-                        self.get_stream().await?.lock().await.as_mut().unwrap().shutdown().await?;
+                        self
+                            .get_stream().await?
+                            .lock().await
+                            .as_mut()
+                            .context(s!("DataStream is None").to_owned())?
+                            .shutdown().await?;
                         return Ok(());
                     }
                     continue;
@@ -243,7 +229,7 @@ impl TrHandler {
         let data_length: u32;
         loop {
             let mut shell_guard = stream_ref.lock().await;
-            let stream = shell_guard.as_mut().unwrap();
+            let stream = shell_guard.as_mut().context(s!("DataStream is None").to_owned())?;
 
             // in here we timeout read u32le, honestly just timeout 50ms and loop, enough time for other thread to lock for writing?
             let mut buf = [0; 4];
@@ -284,7 +270,7 @@ impl TrHandler {
         let mut data_buf = vec![0; data_length as usize];
 
         let mut shell_guard = stream_ref.lock().await;
-        let stream = shell_guard.as_mut().unwrap();
+        let stream = shell_guard.as_mut().context(s!("DataStream is None").to_owned())?;
         // if we received data length we will lock indef until we read that length - so if theres errors GG
 
         stream
@@ -293,7 +279,9 @@ impl TrHandler {
 
         let mut decoder = ZlibDecoder::new(Cursor::new(data_buf));
         let mut decompressed = Vec::new();
-        decoder.read_to_end(&mut decompressed).unwrap();
+        decoder
+            .read_to_end(&mut decompressed)
+            .context(s!("Failed to decoder.read_to_end").to_owned())?;
 
         Ok(decompressed)
     }
@@ -344,9 +332,9 @@ impl TrHandler {
         )?;
 
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::new(5));
-        encoder.write_all(&encrypted_data).unwrap();
+        encoder.write_all(&encrypted_data).context(s!("Failed to encoder.write_all").to_owned())?;
 
-        let compressed = encoder.finish().unwrap();
+        let compressed = encoder.finish().context(s!("Failed to encoder.finish").to_owned())?;
         // println!("encrypted and compressed data len: {}", compressed.len());
         self.send_data(&compressed).await
     }
@@ -356,7 +344,7 @@ impl TrHandler {
         let mut shell_guard = read_stream_ref.lock().await;
         // println!("send_data got stream unlocked");
 
-        let stream = shell_guard.as_mut().unwrap();
+        let stream = shell_guard.as_mut().context(s!("DataStream is None").to_owned())?;
         stream
             .write_all(&(data.len() as u32).to_le_bytes()).await
             .context(s!("Failed to write length of data to stream").to_string())?;

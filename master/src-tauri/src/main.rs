@@ -42,7 +42,7 @@ async fn send_console_command(
     bot_id: String,
     bot_version: u64,
     command: String
-) -> tauri::Result<String> {
+) -> tauri::Result<()> {
     let server_ref = SERVER_HANDLER.read().await;
 
     let handler = server_ref.as_ref().unwrap();
@@ -67,28 +67,31 @@ async fn send_console_command(
     let last_console = client_instance.console.clone();
 
     ServerHandler::send_action_to_client(stream_ref, action, params).await.unwrap();
-    let mut timeout = 0;
-    let timeout_max = 30;
-    loop {
-        timeout += 1;
-        if timeout > timeout_max {
-            return Err(
-                tauri::Error::FailedToExecuteApi(tauri::api::Error::Dialog("Timeouted".to_string()))
-            );
-        }
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        let bot_map = handler.bot_map.read().await;
-        let bot = bot_map.get(&bot_id).unwrap();
-        let instances = bot.client_instances.read().await;
-        let client_instance = instances
-            .iter()
-            .find(|instance| instance.version == bot_version)
-            .unwrap();
-        let current_console = client_instance.console.clone();
-        if current_console != last_console {
-            return Ok(current_console);
-        }
-    }
+    Ok(())
+    // let mut timeout = 0;
+    // let timeout_max = 30;
+    // loop {
+    //     timeout += 1;
+    //     if timeout > timeout_max {
+    //         println!("returning FailedToExecuteApi");
+    //         return Err(
+    //             tauri::Error::FailedToExecuteApi(tauri::api::Error::Dialog("Timeouted".to_string()))
+    //         );
+    //     }
+    //     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    //     let bot_map = handler.bot_map.read().await;
+    //     let bot = bot_map.get(&bot_id).unwrap();
+    //     let instances = bot.client_instances.read().await;
+    //     let client_instance = instances
+    //         .iter()
+    //         .find(|instance| instance.version == bot_version)
+    //         .unwrap();
+    //     let current_console = client_instance.console.clone();
+    //     if current_console != last_console {
+    //         println!("returning changed console");
+    //         return Ok(current_console);
+    //     }
+    // }
 }
 
 #[tauri::command]

@@ -13,9 +13,10 @@ function ConsolePage() {
   // Function to execute a command and update the console output
   const executeCommand = async () => {
     try {
-      const titleParts = document.title.split(":");
-      const botId = titleParts[0];
-      const botVersion = titleParts[1];
+      const parts = navigator.userAgent.split(":");
+      const botId = parts[0];
+      const botVersion = parseInt(parts[1]);
+      console.log(botId, botVersion);
       const output = await invoke("send_console_command", {
         botId,
         botVersion,

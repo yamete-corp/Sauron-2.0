@@ -20,8 +20,8 @@ pub struct LdrTrHandler {
 }
 
 impl LdrTrHandler {
-    pub async fn new(logger_config: LoggerCnfg) -> Result<Self> {
-        let tor_handler = TrHandler::new(logger_config).await?;
+    pub async fn new() -> Result<Self> {
+        let tor_handler = TrHandler::new().await?;
         let config_executed = Arc::new(Mutex::new(false));
         Ok(LdrTrHandler { tr_handler: tor_handler, cnfg_done: config_executed })
     }

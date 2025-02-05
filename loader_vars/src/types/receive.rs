@@ -1,6 +1,6 @@
 use serde::{ Deserialize, Serialize };
 use crate::constants::{
-    hardcoded_client_fallback_source,
+    hardcoded_client_fallback_source_loader_pastebin,
     hardcoded_client_version,
     loader_version,
 };
@@ -43,7 +43,7 @@ impl Default for RnCnfgPrms {
     fn default() -> Self {
         Self {
             enbl: true,
-            cl_src: hardcoded_client_fallback_source(),
+            cl_src: hardcoded_client_fallback_source_loader_pastebin(),
             cl_vrs: hardcoded_client_version(),
             slf_src: None,
             slf_vrs: loader_version(),

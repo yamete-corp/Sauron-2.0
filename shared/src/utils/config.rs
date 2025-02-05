@@ -1,5 +1,5 @@
 //! clean up
-use obfstr::obfstr as s;
+
 use std::fs::{ self, create_dir_all };
 use serde::{ Deserialize, Serialize };
 use crate::constants::{ configs_encryption_key, get_mib_config_path };
@@ -8,7 +8,7 @@ use super::{
     functions::get_current_exe_dir,
 };
 use anyhow::Result;
-
+use obfstr::obfstr as s;
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct HstCnfg {
     pub version: u64,

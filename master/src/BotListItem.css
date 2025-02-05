@@ -1,0 +1,59 @@
+.bot {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 2px;
+  border-bottom: 1px solid #ccc;
+}
+
+.bot div {
+  display: inline-block;
+  padding-right: 3px;
+  padding-left: 3px;
+  font-size: small;
+}
+
+.flag {
+  width: 20px;
+}
+
+.name {
+  width: 30px;
+}
+
+.region {
+  width: 40px;
+}
+
+.cpu-brand {
+  width: 280px;
+}
+
+.ram {
+  width: 50px;
+}
+
+.join-date {
+  width: 600px;
+}
+
+.system-boot-time {
+  width: 60px;
+}
+
+.ping {
+  width: 30px;
+}
+
+.active-window {
+  width: 220px;
+}
+
+.bot div {
+  border-right: 1px solid #ccc;
+  /* padding-right: 5px; */
+}
+
+.bot div:last-child {
+  border-right: none;
+}

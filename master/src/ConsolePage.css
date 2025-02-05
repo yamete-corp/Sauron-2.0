@@ -1,0 +1,46 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.console-output {
+  padding: 10px;
+  background-color: #f0f0f0;
+  border-radius: 5px;
+  height: 80vh;
+  overflow-y: scroll;
+  white-space: pre-wrap;
+}
+
+.input-container {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.input-container input {
+  padding: 10px;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #ccc;
+}
+
+.input-container input:focus {
+  outline: none;
+  border-bottom: 1px solid #4caf50;
+}
+
+.input-container button {
+  padding: 10px;
+  border: none;
+  cursor: pointer;
+  background-color: #4caf50;
+  color: #fff;
+  margin-left: 10px;
+}
+
+.input-container button:hover {
+  background-color: #3e8e41;
+}

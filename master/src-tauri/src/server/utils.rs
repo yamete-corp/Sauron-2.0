@@ -2,8 +2,9 @@ use server_vars::types::bot::{ BotItem, FrontendClientInstance, FrontendLoaderIn
 
 use super::http_server::Bot;
 
-pub fn convert_bot_to_frontend(bot: &Bot) -> BotItem {
-    let latest_client_instance = bot.client_instances
+pub async fn convert_bot_to_frontend(bot: &Bot) -> BotItem {
+    let client_instances = bot.client_instances.read().await;
+    let latest_client_instance = client_instances
         .iter()
         .max_by_key(|client_instance| client_instance.version)
         .unwrap();
@@ -29,6 +30,7 @@ pub fn convert_bot_to_frontend(bot: &Bot) -> BotItem {
         active_window: dynamic_info.active_window.clone(),
         // mib_config: bot.mib_config.clone(),
         client_instances: bot.client_instances
+            .read().await
             .iter()
             .map(|client_instance| FrontendClientInstance {
                 join_date: client_instance.join_date.clone(),
@@ -36,6 +38,7 @@ pub fn convert_bot_to_frontend(bot: &Bot) -> BotItem {
             })
             .collect(),
         loader_instances: bot.loader_instances
+            .read().await
             .iter()
             .map(|loader_instance| FrontendLoaderInstance {
                 join_date: loader_instance.join_date.clone(),

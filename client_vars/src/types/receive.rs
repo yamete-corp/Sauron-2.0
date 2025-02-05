@@ -91,7 +91,6 @@ pub struct UpdateTaskManagerExclusionsParams {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CallTerminalCommandParams {
-    pub clear_console: bool,
     pub command: String,
 }
 

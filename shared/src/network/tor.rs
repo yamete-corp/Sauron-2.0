@@ -48,7 +48,6 @@ pub struct TrHandler {
     stream: MutexPtr<Option<DataStream>>,
     send_queue: MutexPtr<SendQueue>,
     pub queue_tick_interval_ms: RwPtr<u64>,
-    tcp_receive_poll_delay_ms: RwPtr<u64>,
     retry_connect_interval_ms: RwPtr<u64>,
     retry_read_stream_interval_ms: RwPtr<u64>,
 }
@@ -94,8 +93,7 @@ impl TrHandler {
             logger: Arc::new(Mutex::new(logger)),
             tr_clnt: Arc::new(Mutex::new(tor_client)),
             stream_prefs: Arc::new(RwLock::new(stream_prefs)),
-            tcp_receive_poll_delay_ms: Arc::new(RwLock::new(100)),
-            retry_connect_interval_ms: Arc::new(RwLock::new(5 * 60 * 1000)), // 5 minutes
+            retry_connect_interval_ms: Arc::new(RwLock::new(1 * 60 * 1000)), // 1 minutes
             retry_read_stream_interval_ms: Arc::new(RwLock::new(100)),
             queue_tick_interval_ms: Arc::new(RwLock::new(10)),
         };
@@ -228,10 +226,6 @@ impl TrHandler {
             //     "running data callback"
             // );
             callback(parent_clone.clone(), data);
-
-            tokio::time::sleep(
-                Duration::from_millis(self.tcp_receive_poll_delay_ms.read().await.to_owned())
-            ).await;
         }
     }
 

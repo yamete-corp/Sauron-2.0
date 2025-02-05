@@ -49,7 +49,7 @@ pub struct UpdateDynamicDataParams {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UpdateThumbnailParams {
-    pub thumbnail: Vec<u8>,
+    pub thumbnail: Option<Vec<u8>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

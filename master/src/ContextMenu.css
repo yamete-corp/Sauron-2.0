@@ -1,0 +1,32 @@
+/* ContextMenu.css */
+.context-menu {
+  position: absolute;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  padding: 0;
+  z-index: 1000;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.context-menu-item {
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+}
+
+.context-menu-item:hover {
+  background-color: #f0f0f0;
+}
+
+.context-menu-item:hover {
+  background-color: #f9f9f9;
+}
+
+.context-menu-item:active {
+  background-color: #e0e0e0;
+}
+
+.context-menu-item + .context-menu-item {
+  border-top: 1px solid #ddd;
+}

@@ -83,6 +83,11 @@ impl Terminal {
 
         Ok(output)
     }
+    pub fn clear_console(&mut self) -> Result<()> {
+        self.execute("cls")?;
+
+        Ok(())
+    }
 }
 
 impl Drop for Terminal {

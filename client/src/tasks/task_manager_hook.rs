@@ -26,8 +26,6 @@ use wmi::query::FilterValue;
 use std::collections::HashMap;
 use std::time::Duration;
 
-use crate::info;
-
 const QUERY_HOOK_DLL_BYTES: &[u8] = include_bytes!("../../../queryHook/x64/Release/queryHook.dll");
 
 #[derive(Deserialize, Debug)]
@@ -122,7 +120,7 @@ pub async fn write_dll_bytes() -> Result<PathBuf> {
     Ok(dll_path)
 }
 pub async fn run_query_hooker() -> Result<()> {
-    info!("setting up the list of query hook");
+    // info!("setting up the list of query hook");
     setup_query_hooker_list().await?;
 
     let dll_path = write_dll_bytes().await?;
@@ -151,7 +149,7 @@ pub async fn run_query_hooker() -> Result<()> {
         {
             // ref_info!(logger, "new process to be injected, name: ", process.name);
             // ref_info!(logger, "query hook dll onto PID: ", process.process_id);
-            info!("PROCESS TO BE INJECT SPAWNED");
+            // info!("PROCESS TO BE INJECT SPAWNED");
             inject_dll(process.process_id, dll_path.to_str().unwrap())?;
         }
     }

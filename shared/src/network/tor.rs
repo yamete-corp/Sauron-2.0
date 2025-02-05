@@ -145,7 +145,7 @@ impl TrHandler {
             //     self.logger.lock().await.as_ref().expect("no logger"),
             //     "RUNNING self.connect_to_endpoint()"
             // );
-            println!();
+            println!("connecting");
             match self.connect_to_endpoint().await {
                 Ok(()) => {
                     // should send connect callback

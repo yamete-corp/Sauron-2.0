@@ -93,8 +93,8 @@ pub type MutexPtr<T> = Arc<Mutex<T>>;
 
 #[derive(Debug, Clone)]
 pub struct ServerHandler {
-    listener: RwPtr<TcpListener>,
-    pub bot_map: RwPtr<BotMap>,
+    listener: Arc<RwLock<TcpListener>>,
+    pub bot_map: Arc<RwLock<BotMap>>,
     pub loader_send_queue: HashMap<String, HashMap<u64, MutexPtr<SendQueue>>>,
     pub client_send_queue: HashMap<String, HashMap<u64, MutexPtr<SendQueue>>>,
     pub queue_tick_interval_ms: RwPtr<u64>,
@@ -117,7 +117,7 @@ impl ServerHandler {
     pub async fn listen_for_connections(&mut self) -> Result<()> {
         loop {
             match self.listener.read().await.accept().await {
-                Ok((stream, _socket_addr)) => {
+                Ok((stream, socket_addr)) => {
                     println!("new connection!");
                     let self_clone = self.clone();
                     tokio::task::spawn(async move {

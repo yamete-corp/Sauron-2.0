@@ -135,7 +135,7 @@ impl TrHandler {
             //     self.logger.lock().await.as_ref().expect("no logger"),
             //     "RUNNING self.connect_to_endpoint()"
             // );
-            println!("connecting");
+            // // println!("connecting");
             match self.connect_to_endpoint().await {
                 Ok(()) => {
                     // should send connect callback
@@ -167,7 +167,7 @@ impl TrHandler {
                     }
                 }
                 Err(error) => {
-                    eprintln!("Failed to connect_to_endpoint: {}", error);
+                    // eprintln!("Failed to connect_to_endpoint: {}", error);
                     // ref_err!(
                     //     self.logger.lock().await.as_ref().expect("no logger"),
                     //     "Failed to connect_to_endpoint, timeouting retry"
@@ -194,7 +194,7 @@ impl TrHandler {
             let data = match self.read_data().await {
                 Ok(data) => data,
                 Err(error) => {
-                    // eprintln!("read_data error: {}", error);
+                    // // e// println!("read_data error: {}", error);
                     if
                         error.to_string().contains("Stream is closed") ||
                         error.to_string().contains("Stream not connected")
@@ -254,7 +254,7 @@ impl TrHandler {
                     break;
                 }
                 Err(error) => {
-                    // println!("timeout elapsed: {}", error);
+                    // // println!("timeout elapsed: {}", error);
                     //? in here we should check if the queue has something only then unlock and sleep
                     drop(shell_guard);
                     tokio::time::sleep(Duration::from_millis(20)).await;
@@ -335,14 +335,14 @@ impl TrHandler {
         encoder.write_all(&encrypted_data).context(s!("Failed to encoder.write_all").to_owned())?;
 
         let compressed = encoder.finish().context(s!("Failed to encoder.finish").to_owned())?;
-        // println!("encrypted and compressed data len: {}", compressed.len());
+        // // println!("encrypted and compressed data len: {}", compressed.len());
         self.send_data(&compressed).await
     }
     async fn send_data(&self, data: &[u8]) -> Result<()> {
         let read_stream_ref = self.get_stream().await?;
 
         let mut shell_guard = read_stream_ref.lock().await;
-        // println!("send_data got stream unlocked");
+        // // println!("send_data got stream unlocked");
 
         let stream = shell_guard.as_mut().context(s!("DataStream is None").to_owned())?;
         stream
@@ -352,7 +352,7 @@ impl TrHandler {
             .write_all(&data).await
             .context(s!("Failed to write the data to stream").to_string())?;
         stream.flush().await.context(s!("Failed to flush stream").to_string())?;
-        // println!("flushed");
+        // // println!("flushed");
 
         Ok(())
     }

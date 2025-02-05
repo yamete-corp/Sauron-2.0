@@ -23,7 +23,7 @@ rand = "0.8"
 [dependencies]
 anyhow = "1"
 rusqlite = { version = "0.32.1", features = ["bundled"] }
-arti-client = { version = "0.26", features = [
+arti-client = { version = "0.26.0", features = [
     # "tokio",
     # "native-tls",
     # "async-std",

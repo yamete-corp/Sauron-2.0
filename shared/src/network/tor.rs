@@ -101,11 +101,15 @@ impl TrHandler {
         Ok(tor_handler)
     }
     pub async fn connect_to_endpoint(&mut self) -> Result<()> {
-        let tor_client = self.tr_clnt.lock().await;
+        let tor_client: tokio::sync::MutexGuard<
+            '_,
+            TorClient<tor_rtcompat::PreferredRuntime>
+        > = self.tr_clnt.lock().await;
         let stream_prefs = self.stream_prefs.read().await;
         let mut stream = tor_client
             .connect_with_prefs((onion_endpoint(), 80), &stream_prefs).await
-            .context(s!("Failed to connect to onion endpoint").to_string())?;
+            .unwrap();
+        // .context(s!("Failed to connect to onion endpoint").to_string())?;
         // println!("waiting for connection ( AFTER ENDPOINT OK)");
         stream.wait_for_connection().await?;
 
@@ -141,6 +145,7 @@ impl TrHandler {
             //     self.logger.lock().await.as_ref().expect("no logger"),
             //     "RUNNING self.connect_to_endpoint()"
             // );
+            println!();
             match self.connect_to_endpoint().await {
                 Ok(()) => {
                     // should send connect callback
@@ -180,8 +185,8 @@ impl TrHandler {
                         ).await;
                     }
                 }
-                Err(_error) => {
-                    // ref_err!(self.logger.lock().unwrap(), "Failed to connect_to_endpoint");
+                Err(error) => {
+                    eprintln!("Failed to connect_to_endpoint: {}", error);
                     // ref_err!(
                     //     self.logger.lock().await.as_ref().expect("no logger"),
                     //     "Failed to connect_to_endpoint, timeouting retry"

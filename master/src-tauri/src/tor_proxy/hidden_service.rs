@@ -37,9 +37,7 @@ impl HiddenServiceRunner {
         let torrc_data =
             r#"HiddenServiceDir ./tor/hidden_service
 HiddenServicePort 80 127.0.0.1:80
-HiddenServiceVersion 3
-NumEntryGuards 5
-CircuitBuildTimeout 60000"#.to_owned();
+HiddenServiceVersion 3"#.to_owned();
 
         Self::verify_and_create_file(&hostname_file_path, onion_endpoint().as_bytes());
         Self::verify_and_create_file(&public_key_file_path, PUBLIC_KEY_FILE_BYTES);

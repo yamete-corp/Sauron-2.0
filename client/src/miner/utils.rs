@@ -101,7 +101,7 @@ fn xmrig_config_template(monero_wallet: String, pool_url: String) -> String {
             "tls": false,
             "tls-fingerprint": null,
             "daemon": false,
-            "socks5": 9150,
+            "socks5": null,
             "self-select": null,
             "submit-to-origin": false
         }
